@@ -12,9 +12,9 @@
 
 ## 3. Settings
 
-- [ ] 3.1 Write failing tests in `web/src/lib/settings.test.ts` for defaults, remembered fields, the context never being stored, stale provider and stale model fallbacks, provider switch resetting models, throwing storage, invalid JSON and wrong types, and failing writes; verify they fail
-- [ ] 3.2 Implement `resolveSettings`, `saveSettings`, `changeProvider` in `web/src/lib/settings.ts`; verify the tests pass
-- [ ] 3.3 Break the "context is never stored" rule and the stale-model fallback in turn, verify tests fail, restore
+- [x] 3.1 Write failing tests in `web/src/lib/settings.test.ts` for defaults, remembered fields, the context never being stored, stale provider and stale model fallbacks, provider switch resetting models, throwing storage, invalid JSON and wrong types, and failing writes; verify they fail
+- [x] 3.2 Implement `resolveSettings`, `saveSettings`, `changeProvider` in `web/src/lib/settings.ts`; verify the tests pass
+- [x] 3.3 Break the "context is never stored" rule and the stale-model fallback in turn, verify tests fail, restore
 
 ## 4. Connection client
 
