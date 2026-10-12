@@ -23,4 +23,4 @@
 
 - [x] 4.1 Write failing tests for "am 12. Oktober", "am 3. Mai", a day number at the end of the buffer followed by a later result, a three-digit number that still ends a sentence, and `UtteranceEnd` flushing a pending "am 12."; verify they fail
 - [x] 4.2 Implement the one- or two-digit rule next to the abbreviation check; verify all tests pass
-- [ ] 4.3 Disable the rule, verify the new tests fail, restore it; run `npm test`, `npm run typecheck` and the code-review skill on the diff
+- [x] 4.3 Disable the rule, verify the new tests fail, restore it; run `npm test`, `npm run typecheck` and the code-review skill on the diff
