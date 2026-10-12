@@ -40,11 +40,22 @@ export interface SentenceAssembler {
 /** A sentence is never longer than this, so one translation request stays small and fast. */
 const MAX_SENTENCE_LENGTH = 300;
 
+/** A cut closer to the start than this would leave a uselessly short fragment (like "Ja,"). */
+const MIN_PIECE_LENGTH = 100;
+
 const TERMINATORS = new Set(['.', '?', '!', '…']);
 
 // Words whose final dot is not the end of a sentence. Lowercase; compared ignoring case.
 // To support another abbreviation, add it here.
-const ABBREVIATIONS = new Set(['z.b.', 'dr.', 'nr.', 'bzw.', 'ca.', 'e.g.', 'mr.', 'mrs.']);
+const ABBREVIATIONS = new Set([
+  // required by the spec
+  'z.b.', 'dr.', 'nr.', 'bzw.', 'ca.', 'e.g.', 'mr.', 'mrs.',
+  // other common German ones (not "usw." or "etc.": those often really end a sentence)
+  'd.h.', 'u.a.', 'z.zt.', 'prof.', 'hr.', 'fr.', 'str.', 'ggf.', 'evtl.', 'inkl.', 'vgl.',
+]);
+
+// Characters that may close a quotation or bracket right after the end mark: "Ja.“ or (Ja.)
+const CLOSERS = new Set(['"', '“', '”', "'", '’', ')', ']', '»']);
 
 /** True if the word that ends at `end` (exclusive) is a known abbreviation such as "z.B.". */
 function endsWithAbbreviation(buffer: string, end: number): boolean {
@@ -57,9 +68,9 @@ function endsWithAbbreviation(buffer: string, end: number): boolean {
 /** Where to cut a text that is longer than the limit: after the last comma, else at the last space. */
 function findCut(text: string): number {
   const comma = text.lastIndexOf(',', MAX_SENTENCE_LENGTH - 1);
-  if (comma > 0) return comma + 1;
+  if (comma >= MIN_PIECE_LENGTH - 1) return comma + 1;
   const space = text.lastIndexOf(' ', MAX_SENTENCE_LENGTH);
-  if (space > 0) return space;
+  if (space >= MIN_PIECE_LENGTH) return space;
   return MAX_SENTENCE_LENGTH; // no good place: cut in the middle of a word
 }
 
@@ -96,8 +107,11 @@ function extractSentences(buffer: string): { sentences: string[]; rest: string }
       continue;
     }
     // Swallow a run of marks such as "?!" or "...".
-    let end = i + 1;
-    while (end < buffer.length && TERMINATORS.has(buffer[end])) end++;
+    let runEnd = i + 1;
+    while (runEnd < buffer.length && TERMINATORS.has(buffer[runEnd])) runEnd++;
+    // A closing quote or bracket right after the marks belongs to the sentence.
+    let end = runEnd;
+    while (end < buffer.length && CLOSERS.has(buffer[end])) end++;
 
     // A boundary needs a space (or the end of the text) right after the marks.
     // This also keeps numbers and dates whole: in "3.5" or "12.10.2026" the dot is followed
@@ -105,7 +119,7 @@ function extractSentences(buffer: string): { sentences: string[]; rest: string }
     // end of the buffer they wait for the next result instead of being cut off.
     const atEnd = end === buffer.length;
     const spaceAfter = atEnd || /\s/.test(buffer[end]);
-    if (spaceAfter && !endsWithAbbreviation(buffer, end)) {
+    if (spaceAfter && !endsWithAbbreviation(buffer, runEnd)) {
       sentences.push(buffer.slice(start, end).trim());
       start = end;
     }
@@ -152,8 +166,11 @@ export function createSentenceAssembler(): SentenceAssembler {
       return output([]);
     }
 
-    interimText = '';
-    if (transcript) buffer = buffer ? `${buffer} ${transcript}` : transcript;
+    // An empty final result (Deepgram sends them after pauses) must not wipe the live guess.
+    if (transcript) {
+      interimText = '';
+      buffer = buffer ? `${buffer} ${transcript}` : transcript;
+    }
 
     const { sentences, rest } = extractSentences(buffer);
     buffer = rest;
@@ -161,10 +178,10 @@ export function createSentenceAssembler(): SentenceAssembler {
 
     // Text that keeps growing without any boundary is cut off in pieces, so the
     // live buffer never gets longer than one sentence may be.
-    while (buffer.length > MAX_SENTENCE_LENGTH) {
-      const cut = findCut(buffer);
-      texts.push(buffer.slice(0, cut).trim());
-      buffer = buffer.slice(cut).trim();
+    if (buffer.length > MAX_SENTENCE_LENGTH) {
+      const pieces = splitLong(buffer);
+      buffer = pieces.pop()!; // the last piece may still grow, keep it in the buffer
+      texts.push(...pieces);
     }
 
     if (result.speechFinal) texts.push(...flush());

@@ -23,6 +23,8 @@ Greenfield module, no I/O. Input shape comes from Deepgram's `Results` messages 
 - **Force split inside the same scan.** Any candidate piece over 300 characters is cut at the last comma, else last space, within the first 300 characters, else hard-cut at 300. The remainder is processed again.
 - **Abbreviation list as a `Set` of lowercase tokens** at module top, so adding one is a one-line change.
 
+- **Review additions (beyond the original spec text):** more common German abbreviations in the set (not `usw.`/`etc.`), a closing quote or bracket right after an end mark stays in the sentence, length cuts never leave a fragment shorter than 100 characters, and an empty final result does not clear the interim text.
+
 ## Risks / Trade-offs
 
 - [A real sentence ending in an abbreviation, e.g. "...und so weiter bzw."] → it waits for the next result or `speech_final`/`UtteranceEnd`, at worst a one-sentence delay.

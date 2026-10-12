@@ -17,4 +17,4 @@
 - [x] 3.1 Write failing tests for `speech_final` flush, `UtteranceEnd` flush, `UtteranceEnd` with an empty buffer, a 350-character phrase (all pieces at most 300 characters, words preserved), comma preference when splitting, an empty transcript, and punctuation-only input (`...`, ` .`); verify they fail
 - [x] 3.2 Implement `pushUtteranceEnd`, the flush on `speech_final`, the 300-character split and the empty/punctuation filter; verify all tests in the file pass
 - [x] 3.3 Change the limit to 400 and skip the punctuation filter in turn, verify the matching tests fail, then restore
-- [ ] 3.4 Run `npm test` and `npm run typecheck` from the repository root and verify both exit 0; run the code-review skill on the diff and fix its findings
+- [x] 3.4 Run `npm test` and `npm run typecheck` from the repository root and verify both exit 0; run the code-review skill on the diff and fix its findings

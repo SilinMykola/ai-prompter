@@ -215,3 +215,42 @@ describe('empty input', () => {
     expect(assembler.pushResult(final('Hallo.')).sentences[0].id).toBe(1);
   });
 });
+
+describe('review fixes', () => {
+  it.each(['d.h.', 'u.a.', 'Prof.', 'ggf.', 'vgl.', 'inkl.'])('does not split after the common German abbreviation %s', (abbr) => {
+    const out = createSentenceAssembler().pushResult(final(`Wir brauchen das, ${abbr} Ihren Ausweis.`));
+
+    expect(out.sentences).toHaveLength(1);
+  });
+
+  it('ends a sentence when a closing quote follows the dot', () => {
+    const out = createSentenceAssembler().pushResult(final('Er sagte: „Ja.“ Dann ging er.'));
+
+    expect(out.sentences.map((s) => s.text)).toEqual(['Er sagte: „Ja.“', 'Dann ging er.']);
+  });
+
+  it('does not cut at a comma that is too early in a long text', () => {
+    const rest = Array.from({ length: 55 }, (_, i) => `wort${i}`).join(' ');
+    const out = createSentenceAssembler().pushResult(final(`Ja, ${rest}`, true));
+
+    expect(out.sentences[0].text.length).toBeGreaterThan(100);
+  });
+
+  it('keeps the interim text when an empty final result arrives', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(interim('Ich möchte'));
+
+    expect(assembler.pushResult(final('')).interimText).toBe('Ich möchte');
+  });
+
+  it('keeps the buffer cut consistent with sentence splitting for long text', () => {
+    const assembler = createSentenceAssembler();
+    const words = Array.from({ length: 80 }, (_, i) => `wort${i}`).join(' ');
+    const out = assembler.pushResult(final(words));
+
+    // Pieces cut because of length are emitted; the rest stays in the buffer.
+    const rebuilt = [...out.sentences.map((s) => s.text), out.finalText].join(' ');
+    expect(rebuilt).toBe(words);
+    expect(out.finalText.length).toBeLessThanOrEqual(300);
+  });
+});
