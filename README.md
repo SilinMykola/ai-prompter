@@ -34,6 +34,38 @@ Call tab (Chrome) --getDisplayMedia--> web (React) --WebSocket /ws--> server (No
 
 The server listens on `127.0.0.1` only. API keys stay on the server.
 
+## WebSocket protocol
+
+Defined once in [shared/protocol.ts](shared/protocol.ts) and imported by both sides. One socket (`/ws`) is one call session. Audio chunks are sent as binary frames; everything else is JSON with a `type` field.
+
+Client to server:
+
+| `type`        | Fields                                                                                   | When                         |
+|---------------|------------------------------------------------------------------------------------------|------------------------------|
+| `start`       | `language`, `provider`, `translationModel`, `hintModel`, `callContext`, `profile`        | first message after opening  |
+| `hint`        | `id`, `mode` (`short` / `detailed`)                                                      | "Коротко" / "Подробно" pressed |
+| `retranslate` | `id`                                                                                     | "повторить" pressed          |
+| `stop`        | none                                                                                     | "Стоп" pressed               |
+
+Server to client:
+
+| `type`              | Fields                                                              |
+|---------------------|---------------------------------------------------------------------|
+| `status`            | `state`: `connecting`, `listening`, `speaking`, `reconnecting`, `stopped` |
+| `interim`           | `finalText`, `interimText` (the live, unfinished phrase)            |
+| `sentence`          | `id`, `text`, optional `language`                                   |
+| `translation_delta` | `id`, `delta`                                                       |
+| `translation_done`  | `id`                                                                |
+| `translation_error` | `id`                                                                |
+| `hint_start`        | `id`, `mode` (client clears the hint block)                         |
+| `hint_delta`        | `id`, `delta`                                                       |
+| `hint_done`         | `id`                                                                |
+| `hint_error`        | `id`                                                                |
+| `restart_recorder`  | none (client restarts `MediaRecorder` after a reconnect)            |
+| `error`             | `message` (Russian, human-readable)                                 |
+
+`GET /api/config` returns `{ defaultProvider, providers: [{ id, label, models }] }` and never contains keys.
+
 ## Screenshot
 
 _Placeholder: a screenshot will be added when the UI is finished._

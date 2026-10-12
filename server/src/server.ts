@@ -1,5 +1,10 @@
 import express from 'express';
 import type { Server } from 'node:http';
+import type { SessionState } from '@ai-prompter/shared/protocol';
+
+// State of a session that has not started yet. Typed from the shared protocol, so a rename
+// in shared/protocol.ts breaks the server build instead of silently drifting apart.
+export const IDLE_STATE: SessionState = 'stopped';
 
 // The app must never be reachable from other machines (see spec: "Local-only binding").
 // 127.0.0.1 is the loopback address: only programs on this computer can connect.

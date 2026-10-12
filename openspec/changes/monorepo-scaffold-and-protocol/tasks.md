@@ -12,10 +12,10 @@
 
 ## 2. Shared protocol
 
-- [ ] 2.1 Write a failing compile-time test in `shared/protocol.test.ts` that builds one value of every `ClientMessage` and `ServerMessage` variant, narrows with an exhaustive `switch`, and builds an `ApiConfig`; verify it fails because `protocol.ts` does not exist
-- [ ] 2.2 Implement `shared/protocol.ts` per SPEC.md sections 3 and 8 (`Language`, `HintMode`, `ProviderId`, `ClientMessage`, `ServerMessage`, `ApiConfig`); verify the test and `npm run typecheck` pass for `shared`, `server` and `web`
-- [ ] 2.3 Import one protocol type from both `server` and `web` in the placeholders; verify renaming a field in `protocol.ts` makes `npm run typecheck` fail in both, then restore it
-- [ ] 2.4 Add explanatory comments to every protocol type and document the protocol in the README; verify each of the 4 client and 12 server message types appears in the README table
+- [x] 2.1 Write a failing compile-time test in `shared/protocol.test.ts` that builds one value of every `ClientMessage` and `ServerMessage` variant, narrows with an exhaustive `switch`, and builds an `ApiConfig`; verify it fails because `protocol.ts` does not exist
+- [x] 2.2 Implement `shared/protocol.ts` per SPEC.md sections 3 and 8 (`Language`, `HintMode`, `ProviderId`, `ClientMessage`, `ServerMessage`, `ApiConfig`); verify the test and `npm run typecheck` pass for `shared`, `server` and `web`
+- [x] 2.3 Import one protocol type from both `server` and `web` in the placeholders; verify renaming a field in `protocol.ts` makes `npm run typecheck` fail in both, then restore it
+- [x] 2.4 Add explanatory comments to every protocol type and document the protocol in the README; verify each of the 4 client and 12 server message types appears in the README table
 
 ## 3. Integration check
 

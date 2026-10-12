@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { SessionState } from '@ai-prompter/shared/protocol';
 
 type Health = 'checking' | 'ok' | 'down';
 
@@ -16,10 +17,14 @@ export function App() {
       .catch(() => setHealth('down'));
   }, []);
 
+  // Same type as on the server: both sides import it from the shared protocol.
+  const session: SessionState = 'stopped';
+
   return (
     <main>
       <h1>AI Prompter</h1>
       <p>Server: {health}</p>
+      <p>Session: {session}</p>
     </main>
   );
 }
