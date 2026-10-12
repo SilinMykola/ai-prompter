@@ -14,8 +14,8 @@
 
 ## 3. Call screen parts
 
-- [ ] 3.1 Write failing tests for `useHotkeys` (keys 1 and 2, ignored in fields, with modifiers, other keys) and for `isNearBottom` and `useAutoScroll` (follows at the bottom, stays when scrolled up, resumes at the bottom); verify they fail
-- [ ] 3.2 Implement `useHotkeys` and `useAutoScroll`; verify the tests pass
+- [x] 3.1 Write failing tests for `useHotkeys` (keys 1 and 2, ignored in fields, with modifiers, other keys) and for `isNearBottom` and `useAutoScroll` (follows at the bottom, stays when scrolled up, resumes at the bottom); verify they fail
+- [x] 3.2 Implement `useHotkeys` and `useAutoScroll`; verify the tests pass
 - [ ] 3.3 Write failing tests for `SentenceCard` (original and translation, waiting indicator, failed translation with retry, hint buttons, hint block states, keycaps only when latest) and `LivePhrase`; verify they fail
 - [ ] 3.4 Implement `SentenceCard` and `LivePhrase`; verify the tests pass
 - [ ] 3.5 Write failing tests for `CallScreen` (state labels, language/provider/model line, error line, stop button, cards in order, live phrase, hotkeys wired to the latest card, "Начать заново" after stop, notice line); verify they fail
