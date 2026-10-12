@@ -301,3 +301,189 @@ describe('closing', () => {
     expect(sockets[0].terminateCalls).toBe(1);
   });
 });
+
+// Opens the stream and makes the connection "good": open plus a first message from the service.
+function connectAndReceive(sockets: ReturnType<typeof setup>['sockets'], index = 0) {
+  sockets[index].open();
+  sockets[index].receive({ type: 'Metadata' });
+}
+
+describe('reconnecting', () => {
+  it('tells the caller, retries after 0.5 s, and asks for a recorder restart once open again', () => {
+    const { sockets, h } = setup();
+    connectAndReceive(sockets);
+
+    sockets[0].drop();
+    expect(h.onReconnecting).toHaveBeenCalledTimes(1);
+    expect(sockets).toHaveLength(1);
+
+    vi.advanceTimersByTime(499);
+    expect(sockets).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(sockets).toHaveLength(2);
+
+    sockets[1].open();
+    expect(h.onOpen).toHaveBeenCalledTimes(2);
+    expect(h.onRestartRecorder).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses the same URL and key for every attempt', () => {
+    const { sockets } = setup('de');
+    connectAndReceive(sockets);
+    sockets[0].drop();
+    vi.advanceTimersByTime(500);
+
+    expect(sockets[1].url).toBe(sockets[0].url);
+    expect(sockets[1].headers).toEqual(sockets[0].headers);
+  });
+
+  it('backs off 0.5, 1, 2, 4, 8 seconds and then gives up with a fatal error', () => {
+    const { sockets, h } = setup();
+    connectAndReceive(sockets);
+    sockets[0].drop();
+
+    const delays = [500, 1000, 2000, 4000, 8000];
+    delays.forEach((delay, i) => {
+      vi.advanceTimersByTime(delay - 1);
+      expect(sockets).toHaveLength(i + 1);
+      vi.advanceTimersByTime(1);
+      expect(sockets).toHaveLength(i + 2);
+      sockets[i + 1].drop(); // the attempt fails without ever opening
+    });
+
+    expect(h.onFatal).toHaveBeenCalledTimes(1);
+    expect(h.onFatal).toHaveBeenCalledWith(expect.objectContaining({ kind: 'connection' }));
+    vi.advanceTimersByTime(60_000);
+    expect(sockets).toHaveLength(6);
+  });
+
+  it('reports "reconnecting" once per outage, not once per failed attempt', () => {
+    const { sockets, h } = setup();
+    connectAndReceive(sockets);
+    sockets[0].drop();
+    vi.advanceTimersByTime(500);
+    sockets[1].drop();
+    vi.advanceTimersByTime(1000);
+
+    expect(h.onReconnecting).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts the schedule over after a connection that worked', () => {
+    const { sockets } = setup();
+    connectAndReceive(sockets);
+    sockets[0].drop();
+    vi.advanceTimersByTime(500);
+    sockets[1].drop(); // a failed attempt: next delay would be 1 s
+    vi.advanceTimersByTime(1000);
+    connectAndReceive(sockets, 2); // this one works
+    sockets[2].drop();
+
+    vi.advanceTimersByTime(500);
+
+    expect(sockets).toHaveLength(4);
+  });
+
+  it('discards audio while reconnecting (it would not start with a container header)', () => {
+    const { stream, sockets } = setup();
+    connectAndReceive(sockets);
+    sockets[0].drop();
+
+    stream.send(chunk(1));
+    vi.advanceTimersByTime(500);
+    sockets[1].open();
+    stream.send(chunk(2));
+
+    expect(sockets[1].audio).toEqual([chunk(2)]);
+  });
+
+  it('ignores late messages from a connection it has already replaced', () => {
+    const { sockets, h } = setup();
+    connectAndReceive(sockets);
+    sockets[0].drop();
+    vi.advanceTimersByTime(500);
+    sockets[1].open();
+
+    sockets[0].receive(resultMessage('stale', true));
+
+    expect(h.onResult).not.toHaveBeenCalled();
+  });
+
+  it('does not reconnect after close()', async () => {
+    const { stream, sockets, h } = setup();
+    connectAndReceive(sockets);
+    const closing = stream.close();
+    sockets[0].drop(1000);
+    await closing;
+
+    vi.advanceTimersByTime(60_000);
+
+    expect(sockets).toHaveLength(1);
+    expect(h.onReconnecting).not.toHaveBeenCalled();
+  });
+
+  it('cancels a pending retry when closed during an outage', async () => {
+    const { stream, sockets } = setup();
+    connectAndReceive(sockets);
+    sockets[0].drop();
+
+    await stream.close();
+    vi.advanceTimersByTime(60_000);
+
+    expect(sockets).toHaveLength(1);
+  });
+
+  it('survives an error event on the socket', () => {
+    const { sockets, h } = setup();
+
+    expect(() => sockets[0].emit('error', new Error('socket hang up'))).not.toThrow();
+    expect(h.onFatal).not.toHaveBeenCalled();
+  });
+});
+
+describe('first connection', () => {
+  it('retries when the first attempt fails and keeps the audio that was waiting', () => {
+    const { stream, sockets, h } = setup();
+    stream.send(chunk(1));
+
+    sockets[0].reject(503);
+    vi.advanceTimersByTime(500);
+    expect(sockets).toHaveLength(2);
+    sockets[1].open();
+
+    expect(sockets[1].audio).toEqual([chunk(1)]);
+    expect(h.onRestartRecorder).not.toHaveBeenCalled();
+  });
+});
+
+describe('rejected key', () => {
+  it.each([401, 403])('is fatal at once for HTTP %i, without retries', (status) => {
+    const { sockets, h } = setup();
+
+    sockets[0].reject(status);
+    vi.advanceTimersByTime(60_000);
+
+    expect(h.onFatal).toHaveBeenCalledTimes(1);
+    expect(h.onFatal).toHaveBeenCalledWith(expect.objectContaining({ kind: 'auth' }));
+    expect(sockets).toHaveLength(1);
+    expect(sockets[0].terminateCalls).toBe(1);
+    expect(h.onReconnecting).not.toHaveBeenCalled();
+  });
+});
+
+describe('privacy', () => {
+  it('never logs transcript text', () => {
+    const consoleSpies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => {}));
+    const { sockets, stream, log } = setup();
+    connectAndReceive(sockets);
+
+    sockets[0].receive(resultMessage('geheimer Satz', true, true));
+    sockets[0].drop();
+    vi.advanceTimersByTime(500);
+    void stream.close();
+
+    const everything = JSON.stringify([log.mock.calls, ...consoleSpies.map((spy) => spy.mock.calls)]);
+    expect(everything).not.toContain('geheimer');
+    expect(log).toHaveBeenCalled(); // events are logged, just not their text
+    consoleSpies.forEach((spy) => spy.mockRestore());
+  });
+});

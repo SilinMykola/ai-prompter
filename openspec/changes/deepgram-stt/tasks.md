@@ -15,10 +15,10 @@
 
 ## 3. Reconnecting and failures
 
-- [ ] 3.1 Write failing tests for the reconnect schedule 0.5/1/2/4/8 s, `onReconnecting`, `onOpen` and `onRestartRecorder` after recovery, audio discarded while reconnecting, giving up with `onFatal` after five failures, the counter resetting after a good connection, no reconnect after `close()`, and HTTP 401 as an immediate fatal error with kind `auth`; verify they fail
-- [ ] 3.2 Implement reconnecting and failure handling; verify all tests in the file pass
-- [ ] 3.3 Add a test that no transcript text reaches the `log` callback or `console` during a run; verify, then break it by logging a result and see it fail, restore
-- [ ] 3.4 Break the retry limit and the auth handling in turn, verify tests fail, restore
+- [x] 3.1 Write failing tests for the reconnect schedule 0.5/1/2/4/8 s, `onReconnecting`, `onOpen` and `onRestartRecorder` after recovery, audio discarded while reconnecting, giving up with `onFatal` after five failures, the counter resetting after a good connection, no reconnect after `close()`, and HTTP 401 as an immediate fatal error with kind `auth`; verify they fail
+- [x] 3.2 Implement reconnecting and failure handling; verify all tests in the file pass
+- [x] 3.3 Add a test that no transcript text reaches the `log` callback or `console` during a run; verify, then break it by logging a result and see it fail, restore
+- [x] 3.4 Break the retry limit and the auth handling in turn, verify tests fail, restore
 
 ## 4. Live check and wrap-up
 
