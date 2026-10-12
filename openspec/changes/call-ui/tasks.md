@@ -8,9 +8,9 @@
 
 ## 2. Setup screen
 
-- [ ] 2.1 Write failing component tests in `web/src/components/SetupScreen.test.tsx` for defaults, labels and placeholders, single provider as text, provider change resetting models, model lists, submit passing the current settings, error display with "Попробовать снова", and the form staying usable; verify they fail
-- [ ] 2.2 Implement `SetupScreen`; verify the tests pass
-- [ ] 2.3 Break the provider reset and the single-provider rule in turn, verify tests fail, restore
+- [x] 2.1 Write failing component tests in `web/src/components/SetupScreen.test.tsx` for defaults, labels and placeholders, single provider as text, provider change resetting models, model lists, submit passing the current settings, error display with "Попробовать снова", and the form staying usable; verify they fail
+- [x] 2.2 Implement `SetupScreen`; verify the tests pass
+- [x] 2.3 Break the provider reset and the single-provider rule in turn, verify tests fail, restore
 
 ## 3. Call screen parts
 
