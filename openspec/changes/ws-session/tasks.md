@@ -20,12 +20,12 @@
 
 ## 4. Endpoint and origin check
 
-- [ ] 4.1 Write failing tests in `server/src/wsEndpoint.test.ts` with a real `ws` client against a real server on port 0 and a fake STT: accepted for `Host` 127.0.0.1 and no `Origin`; accepted with matching local `Origin`; refused for a foreign `Origin`; refused for a non-local `Host`; refused for another path; a full flow `start` -> audio -> sentence -> `stop`; verify they fail
-- [ ] 4.2 Implement `server/src/wsEndpoint.ts` and attach it in `server/src/server.ts`; verify the tests pass
-- [ ] 4.3 Break the origin check and the host check in turn, verify the tests fail, restore
+- [x] 4.1 Write failing tests in `server/src/wsEndpoint.test.ts` with a real `ws` client against a real server on port 0 and a fake STT: accepted for `Host` 127.0.0.1 and no `Origin`; accepted with matching local `Origin`; refused for a foreign `Origin`; refused for a non-local `Host`; refused for another path; a full flow `start` -> audio -> sentence -> `stop`; verify they fail
+- [x] 4.2 Implement `server/src/wsEndpoint.ts` and attach it in `server/src/server.ts`; verify the tests pass
+- [x] 4.3 Break the origin check and the host check in turn, verify the tests fail, restore
 
 ## 5. Wiring and live check
 
-- [ ] 5.1 Wire the real Deepgram provider and registry in `server/src/index.ts`; verify `npm run typecheck`
+- [x] 5.1 Wire the real Deepgram provider and registry in `server/src/index.ts`; verify `npm run typecheck`
 - [ ] 5.2 Run a live check: start the real server, connect with a `ws` client from a script, send `start` (default models) and the synthesised German WAV, and see `status`, `interim`, `sentence` and `stopped` messages; check the server log has event names only
 - [ ] 5.3 Document the endpoint and the origin rule in the README; run `npm test`, `npm run typecheck` and the code-review skill; fix findings

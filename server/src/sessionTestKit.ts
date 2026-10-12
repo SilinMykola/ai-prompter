@@ -42,6 +42,7 @@ export function fakeStt() {
         send: (chunk) => void record.sent.push(chunk),
         close: async () => {
           record.closeCalls++;
+          await Promise.resolve(); // the real stream needs time to finish: results arrive *after* close() was called
           record.whileClosing?.();
         },
       };

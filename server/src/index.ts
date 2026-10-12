@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { ConfigError, loadConfig } from './config';
 import { createRegistry } from './llm';
 import { realFactories } from './llm/factories';
+import { createDeepgramProvider } from './stt/deepgram';
 import { startServer } from './server';
 
 // Settings live in the .env file in the repository root (two levels up from this file).
@@ -31,5 +32,14 @@ for (const warning of config.warnings) console.warn(`warning: ${warning}`);
 // During `npm run dev` there is no dist folder and Vite serves the page instead.
 const distDir = fileURLToPath(new URL('../../web/dist', import.meta.url));
 const registry = createRegistry(config, realFactories);
-await startServer({ port: config.port, staticDir: existsSync(distDir) ? distDir : undefined, registry });
+// Logging goes through one function so it is easy to check what is (and is not) logged:
+// only event names, never text from a call.
+const log = (event: string) => console.log(`[${new Date().toISOString()}] ${event}`);
+const stt = createDeepgramProvider({ apiKey: config.deepgram.apiKey, model: config.deepgram.model, log });
+await startServer({
+  port: config.port,
+  staticDir: existsSync(distDir) ? distDir : undefined,
+  registry,
+  ws: { stt, registry, log },
+});
 console.log(`server listening on http://127.0.0.1:${config.port}`);
