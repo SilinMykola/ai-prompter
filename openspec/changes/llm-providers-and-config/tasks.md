@@ -2,10 +2,10 @@
 
 ## 1. Configuration
 
-- [ ] 1.1 Write failing tests in `server/src/config.test.ts` for missing Deepgram key, no LLM key, one LLM key, blank values, default provider choice and warning, model overrides (with spaces), and blank `PORT`; verify they fail
-- [ ] 1.2 Implement `loadConfig(env)` and `ConfigError` in `server/src/config.ts`; verify the tests pass
-- [ ] 1.3 Make `server/src/index.ts` use `loadConfig`, print a `ConfigError` message and exit with code 1; verify by starting the server with an empty environment and seeing the message and exit code 1
-- [ ] 1.4 Break the default-provider rule and the blank-value rule in turn, verify tests fail, restore; document the variables in `.env.example`
+- [x] 1.1 Write failing tests in `server/src/config.test.ts` for missing Deepgram key, no LLM key, one LLM key, blank values, default provider choice and warning, model overrides (with spaces), and blank `PORT`; verify they fail
+- [x] 1.2 Implement `loadConfig(env)` and `ConfigError` in `server/src/config.ts`; verify the tests pass
+- [x] 1.3 Make `server/src/index.ts` use `loadConfig`, print a `ConfigError` message and exit with code 1; verify by starting the server with an empty environment and seeing the message and exit code 1
+- [x] 1.4 Break the default-provider rule and the blank-value rule in turn, verify tests fail, restore; document the variables in `.env.example`
 
 ## 2. Errors and model selection
 
