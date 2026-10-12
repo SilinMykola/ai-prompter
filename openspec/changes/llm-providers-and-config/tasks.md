@@ -9,10 +9,10 @@
 
 ## 2. Errors and model selection
 
-- [ ] 2.1 Write failing tests in `server/src/llm/errors.test.ts` for status mapping (429, 401, 403, 408, 504, 500, a timeout-named error, an abort error); verify they fail
-- [ ] 2.2 Implement `LlmError` and `toLlmError` in `server/src/llm/errors.ts`; verify the tests pass
-- [ ] 2.3 Write failing tests in `server/src/llm/models.test.ts` for filtering the noisy Gemini list (using a trimmed copy of the real list as a fixture), prefix stripping, Claude filtering, version comparison, preview tie-break, and default fast/strong selection; verify they fail
-- [ ] 2.4 Implement `filterGeminiModels`, `filterClaudeModels`, `pickDefaults` in `server/src/llm/models.ts`; verify the tests pass
+- [x] 2.1 Write failing tests in `server/src/llm/errors.test.ts` for status mapping (429, 401, 403, 408, 504, 500, a timeout-named error, an abort error); verify they fail
+- [x] 2.2 Implement `LlmError` and `toLlmError` in `server/src/llm/errors.ts`; verify the tests pass
+- [x] 2.3 Write failing tests in `server/src/llm/models.test.ts` for filtering the noisy Gemini list (using a trimmed copy of the real list as a fixture), prefix stripping, Claude filtering, version comparison, preview tie-break, and default fast/strong selection; verify they fail
+- [x] 2.4 Implement `filterGeminiModels`, `filterClaudeModels`, `pickDefaults` in `server/src/llm/models.ts`; verify the tests pass
 - [ ] 2.5 Break the deny pattern and the version comparison in turn, verify tests fail, restore
 
 ## 3. Providers
