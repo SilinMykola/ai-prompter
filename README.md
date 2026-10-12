@@ -129,9 +129,11 @@ Server to client:
 
 `GET /api/config` returns `{ defaultProvider, providers: [{ id, label, models, defaultTranslationModel, defaultHintModel }] }` and never contains keys.
 
-## Screenshot
+## Screenshots
 
-_Placeholder: a screenshot will be added when the UI is finished._
+Sample content, rendered at 420 px width (the setup form and a call in progress):
+
+<img src="docs/screenshots/setup.png" alt="Setup screen" width="320"> <img src="docs/screenshots/call.png" alt="Call screen" width="320">
 
 ## Ports
 
@@ -141,3 +143,29 @@ _Placeholder: a screenshot will be added when the UI is finished._
 | 5175 | Vite dev server (`WEB_PORT`), proxies `/api` and `/ws` to 8787 |
 
 SPEC.md mentions 5173 for Vite; this project uses 5175 because 5173 is taken on the author's machine.
+
+## How to add a provider
+
+A provider is a language model service behind the `LlmProvider` interface (`server/src/llm/types.ts`).
+
+1. Write `server/src/llm/<name>.ts` with a factory that takes the service's client and returns `{ id, label, listModels(), stream(request) }`. `stream` yields text pieces, treats cancellation (`request.signal`) as a quiet end, and throws `LlmError` (use `toLlmError`) for failures; `listModels` returns only chat models (see `models.ts` for filtering and default choice). Test it with a fake client like `gemini.test.ts` does.
+2. Add its id to `ProviderId` in `shared/protocol.ts`, and register it: add the key and optional model variables in `server/src/config.ts`, a factory in `server/src/llm/factories.ts`, and the label in the screens if needed.
+3. Add the variables to `.env.example` (`<NAME>_API_KEY`, optional `<NAME>_MODELS`).
+4. Run `npm run typecheck`: the compiler points at every place that must know about the new id.
+
+Speech recognition works the same way behind `SttProvider` (`server/src/stt/types.ts`); Deepgram is the only implementation.
+
+## Known limitations
+
+- **Chrome only.** Tab-audio capture and the floating window rely on Chrome (116 or newer). On macOS, Chrome cannot capture the sound of other apps (Zoom/Teams desktop clients); use a browser tab, or the microphone with the speakerphone on.
+- **Checked here only with synthesised speech, not with a real call in a browser.** The whole chain (speech, sentences, translation, hints, the origin check, reconnects at the code level) was exercised with tests and live API calls using generated German speech. Not verified automatically: the real share dialog with a Chrome tab, real `webm/opus` audio into Deepgram (the docs describe container formats in general), the floating window opened by a real click, and Claude (no Anthropic key was available; it is covered by tests with a fake client).
+- **Free-tier API limits.** Pro-class Gemini models often have no free quota (HTTP 429); the default hint model is a plain flash for that reason. Parallel translations of fast speech can hit rate limits; the app shows a short note, waits 2 seconds, retries once, and offers "повторить".
+- **Small fast models are not perfect translators.** For example, they may add a bracketed German word that was not said. Pick a stronger translation model on the setup screen if quality matters more than speed.
+- **Sentence splitting is a heuristic.** Dots after one- or two-digit numbers ("am 12. Oktober") are treated as part of a date, so a sentence that really ends with such a number is joined with the next one. Common abbreviations are listed in `server/src/sentences.ts`.
+- **One call at a time, local only.** The server listens on 127.0.0.1 and refuses WebSocket connections from other web sites; nothing is stored, and there are no accounts.
+- **The floating window is opaque** and needs the main page to stay open.
+
+### Differences from SPEC.md
+
+The deviations are described where they apply: the Vite port 5175, models from the provider APIs, fallback Claude ids, `defaultTranslationModel` / `defaultHintModel` in `/api/config`, `KeepAlive` every 4 seconds, dropping all early audio on overflow, the protocol additions `translation_start` and `notice`, prompts written in English, and the floating window being part of v1.
+
