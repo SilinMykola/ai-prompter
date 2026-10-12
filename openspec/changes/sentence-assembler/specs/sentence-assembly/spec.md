@@ -47,6 +47,25 @@ A dot between two digits SHALL NOT end a sentence.
 - **WHEN** a final result "Der Termin ist am 12.10.2026. Passt das?" arrives
 - **THEN** the sentences "Der Termin ist am 12.10.2026." and "Passt das?" are emitted
 
+### Requirement: No split after a day number
+A dot that directly follows a number of one or two digits (a German ordinal date such as "12." or "3.") SHALL NOT end a sentence, so that "am 12. Oktober" stays whole. A number of three or more digits followed by a dot SHALL still end a sentence.
+
+#### Scenario: Date with a month name
+- **WHEN** a final result "Der Termin ist am 12. Oktober um 10 Uhr." arrives
+- **THEN** one sentence "Der Termin ist am 12. Oktober um 10 Uhr." is emitted
+
+#### Scenario: Single-digit day
+- **WHEN** a final result "Wir treffen uns am 3. Mai." arrives
+- **THEN** one sentence "Wir treffen uns am 3. Mai." is emitted
+
+#### Scenario: Day number at the end of the buffer
+- **WHEN** a final result "Der Termin ist am 12." arrives and a later final result "Oktober." follows
+- **THEN** nothing is emitted after the first result and one sentence "Der Termin ist am 12. Oktober." is emitted after the second
+
+#### Scenario: Longer number still ends a sentence
+- **WHEN** a final result "Ich habe 123. Dann gehe ich." arrives
+- **THEN** the sentences "Ich habe 123." and "Dann gehe ich." are emitted
+
 ### Requirement: No split after abbreviations
 A dot that ends one of `z.B.`, `Dr.`, `Nr.`, `bzw.`, `ca.`, `e.g.`, `Mr.`, `Mrs.` (case-insensitive) SHALL NOT end a sentence.
 

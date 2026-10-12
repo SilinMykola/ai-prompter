@@ -57,12 +57,23 @@ const ABBREVIATIONS = new Set([
 // Characters that may close a quotation or bracket right after the end mark: "Ja.“ or (Ja.)
 const CLOSERS = new Set(['"', '“', '”', "'", '’', ')', ']', '»']);
 
-/** True if the word that ends at `end` (exclusive) is a known abbreviation such as "z.B.". */
-function endsWithAbbreviation(buffer: string, end: number): boolean {
-  // The word is everything after the last whitespace; opening quotes/brackets are not part of it.
+/** The whitespace-delimited word that ends at `end` (exclusive), without opening quotes/brackets. */
+function wordEndingAt(buffer: string, end: number): string {
   const wordStart = buffer.slice(0, end).search(/\S+$/);
-  const word = buffer.slice(wordStart, end).replace(/^[("„“'‚]+/, '');
-  return ABBREVIATIONS.has(word.toLowerCase());
+  return buffer.slice(wordStart, end).replace(/^[("„“'‚]+/, '');
+}
+
+/** True if the word is a known abbreviation such as "z.B.". */
+function endsWithAbbreviation(buffer: string, end: number): boolean {
+  return ABBREVIATIONS.has(wordEndingAt(buffer, end).toLowerCase());
+}
+
+/**
+ * True if the word is a one- or two-digit number with a dot: a German ordinal date such as
+ * "12." in "am 12. Oktober". Numbers with three or more digits ("123.") are not matched.
+ */
+function endsWithDayNumber(buffer: string, end: number): boolean {
+  return /^\d{1,2}\.$/.test(wordEndingAt(buffer, end));
 }
 
 /** Where to cut a text that is longer than the limit: after the last comma, else at the last space. */
@@ -115,11 +126,11 @@ function extractSentences(buffer: string): { sentences: string[]; rest: string }
 
     // A boundary needs a space (or the end of the text) right after the marks.
     // This also keeps numbers and dates whole: in "3.5" or "12.10.2026" the dot is followed
-    // by a digit, not by a space. Abbreviations like "z.B." are skipped explicitly; at the
+    // by a digit, not by a space. Abbreviations like "z.B." and day numbers like "12." are skipped explicitly; at the
     // end of the buffer they wait for the next result instead of being cut off.
     const atEnd = end === buffer.length;
     const spaceAfter = atEnd || /\s/.test(buffer[end]);
-    if (spaceAfter && !endsWithAbbreviation(buffer, runEnd)) {
+    if (spaceAfter && !endsWithAbbreviation(buffer, runEnd) && !endsWithDayNumber(buffer, runEnd)) {
       sentences.push(buffer.slice(start, end).trim());
       start = end;
     }

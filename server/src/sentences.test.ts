@@ -254,3 +254,39 @@ describe('review fixes', () => {
     expect(out.finalText.length).toBeLessThanOrEqual(300);
   });
 });
+
+describe('day numbers (German ordinal dates)', () => {
+  it('does not split after a two-digit day', () => {
+    const out = createSentenceAssembler().pushResult(final('Der Termin ist am 12. Oktober um 10 Uhr.'));
+
+    expect(out.sentences.map((s) => s.text)).toEqual(['Der Termin ist am 12. Oktober um 10 Uhr.']);
+  });
+
+  it('does not split after a one-digit day', () => {
+    const out = createSentenceAssembler().pushResult(final('Wir treffen uns am 3. Mai.'));
+
+    expect(out.sentences.map((s) => s.text)).toEqual(['Wir treffen uns am 3. Mai.']);
+  });
+
+  it('waits when the buffer ends with a day number', () => {
+    const assembler = createSentenceAssembler();
+    const first = assembler.pushResult(final('Der Termin ist am 12.'));
+    const second = assembler.pushResult(final('Oktober.'));
+
+    expect(first.sentences).toEqual([]);
+    expect(second.sentences.map((s) => s.text)).toEqual(['Der Termin ist am 12. Oktober.']);
+  });
+
+  it('flushes a pending day number at the end of the utterance', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(final('Der Termin ist am 12.'));
+
+    expect(assembler.pushUtteranceEnd().sentences.map((s) => s.text)).toEqual(['Der Termin ist am 12.']);
+  });
+
+  it('still splits after a number with three or more digits', () => {
+    const out = createSentenceAssembler().pushResult(final('Ich habe 123. Dann gehe ich.'));
+
+    expect(out.sentences.map((s) => s.text)).toEqual(['Ich habe 123.', 'Dann gehe ich.']);
+  });
+});
