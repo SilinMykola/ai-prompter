@@ -34,6 +34,16 @@ Call tab (Chrome) --getDisplayMedia--> web (React) --WebSocket /ws--> server (No
 
 The server listens on `127.0.0.1` only. API keys stay on the server.
 
+## Speech recognition
+
+Audio goes to Deepgram's live endpoint (`wss://api.deepgram.com/v1/listen`) over a plain WebSocket, behind the `SttProvider` interface in `server/src/stt/`. Settings: `interim_results`, `smart_format`, `punctuate`, `endpointing=300`, `utterance_end_ms=1000`, `vad_events`; no `encoding`/`sample_rate`, because the browser sends a webm container. `language=multi` (Nova-3) covers German and English. A lost connection is retried after 0.5, 1, 2, 4 and 8 seconds; the browser is then asked to restart its recorder so the new connection gets a fresh webm header.
+
+Differences from SPEC.md:
+
+- `KeepAlive` is sent after 4 seconds of silence instead of 5: Deepgram closes a connection after 10 seconds without audio or `KeepAlive`, and its docs advise 3-5 seconds.
+- Audio held while the first connection opens is dropped as a whole (and a recorder restart is requested) when it exceeds 5 seconds, because dropping only the oldest chunks would lose the webm header.
+- Not yet verified: that Deepgram accepts the browser's webm/opus without an explicit `encoding`. The docs describe this for containers in general; it is confirmed only by a test with a real browser.
+
 ## LLM providers and models
 
 The app supports Gemini and Claude behind one interface (`server/src/llm/`). A provider is available only if its API key is set; one key is enough. `LLM_PROVIDER` chooses the default and falls back to the first available provider (Gemini, then Claude).

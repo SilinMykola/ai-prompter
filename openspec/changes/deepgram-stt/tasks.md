@@ -22,5 +22,5 @@
 
 ## 4. Live check and wrap-up
 
-- [ ] 4.1 Run a manual check with the real key: stream the synthesised German WAV through `createDeepgramProvider`, see interim and final results, close gracefully, and confirm no key or text in the logs
-- [ ] 4.2 Document the Deepgram settings and the keep-alive deviation in the README; run `npm test`, `npm run typecheck` and the code-review skill; fix findings
+- [x] 4.1 Run a manual check with the real key: stream the synthesised German WAV through `createDeepgramProvider`, see interim and final results, close gracefully, and confirm no key or text in the logs
+- [x] 4.2 Document the Deepgram settings and the keep-alive deviation in the README; run `npm test`, `npm run typecheck` and the code-review skill; fix findings
