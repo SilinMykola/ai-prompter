@@ -16,6 +16,17 @@ export class LlmError extends Error {
   }
 }
 
+/**
+ * The error's name. Some SDK errors never set `name` (it stays "Error"), so the class name
+ * (for example APIConnectionTimeoutError) is the only hint about what happened.
+ */
+function nameOf(error: unknown): string {
+  const own = (error as { name?: unknown } | null)?.name;
+  if (typeof own === 'string' && own !== 'Error') return own;
+  const className = (error as { constructor?: { name?: unknown } } | null)?.constructor?.name;
+  return typeof className === 'string' ? className : '';
+}
+
 function kindForStatus(status: number | undefined): LlmErrorKind {
   if (status === 429) return 'rate_limit';
   if (status === 401 || status === 403) return 'auth';
@@ -32,8 +43,7 @@ export function toLlmError(provider: string, error: unknown): LlmError {
   if (error instanceof LlmError) return error;
 
   const status = typeof (error as { status?: unknown })?.status === 'number' ? (error as { status: number }).status : undefined;
-  const name = (error as { name?: unknown })?.name;
-  const isTimeoutByName = typeof name === 'string' && /timeout/i.test(name);
+  const isTimeoutByName = /timeout/i.test(nameOf(error));
 
   const kind = isTimeoutByName ? 'timeout' : kindForStatus(status);
   const detail = status !== undefined ? `HTTP ${status}` : isTimeoutByName ? 'timeout' : 'unknown error';
@@ -42,6 +52,6 @@ export function toLlmError(provider: string, error: unknown): LlmError {
 
 /** True for the errors thrown when a request is cancelled on purpose (not a real failure). */
 export function isAbortError(error: unknown): boolean {
-  const name = (error as { name?: unknown } | null)?.name;
+  const name = nameOf(error);
   return name === 'AbortError' || name === 'APIUserAbortError';
 }

@@ -47,12 +47,15 @@ function parseModelList(value: string | undefined): string[] | undefined {
     .split(',')
     .map((m) => m.trim())
     .filter(Boolean);
-  return models.length > 0 ? models : undefined;
+  return models.length > 0 ? [...new Set(models)] : undefined; // Set removes duplicates, keeping order
 }
 
-function parsePort(value: string | undefined): number {
+function parsePort(value: string | undefined, warnings: string[]): number {
+  if (!value?.trim()) return DEFAULT_PORT; // empty means "use the default", no warning needed
   const port = Number(value);
-  return Number.isInteger(port) && port > 0 ? port : DEFAULT_PORT;
+  if (Number.isInteger(port) && port > 0 && port <= 65535) return port;
+  warnings.push(`PORT=${value} is not a valid port (1-65535); using ${DEFAULT_PORT}.`);
+  return DEFAULT_PORT;
 }
 
 export function loadConfig(env: Env): AppConfig {
@@ -76,7 +79,7 @@ export function loadConfig(env: Env): AppConfig {
     );
   }
 
-  const wanted = read(env, 'LLM_PROVIDER');
+  const wanted = read(env, 'LLM_PROVIDER')?.toLowerCase();
   let defaultProvider = available[0];
   if (wanted) {
     if (available.includes(wanted as ProviderId)) {
@@ -87,7 +90,7 @@ export function loadConfig(env: Env): AppConfig {
   }
 
   return {
-    port: parsePort(env.PORT),
+    port: parsePort(env.PORT, warnings),
     deepgram: { apiKey: deepgramKey, model: read(env, 'DEEPGRAM_MODEL') ?? 'nova-3' },
     providers,
     defaultProvider,

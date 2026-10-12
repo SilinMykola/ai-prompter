@@ -28,9 +28,12 @@ export function filterClaudeModels(ids: string[]): string[] {
   return ids.filter((id) => id.startsWith('claude-'));
 }
 
-/** "gemini-3.5-flash-lite" -> [3, 5]; "claude-haiku-4-5-20251001" -> [4, 5, 20251001]. */
+/**
+ * "gemini-3.5-flash-lite" -> [3, 5]; "claude-haiku-4-5-20251001" -> [4, 5].
+ * Only the first two numbers are the version; later ones are dates of snapshots/previews.
+ */
 function versionOf(id: string): number[] {
-  return (id.match(/\d+/g) ?? []).map(Number);
+  return (id.match(/\d+/g) ?? []).slice(0, 2).map(Number);
 }
 
 /** Compares version arrays number by number (so 3.10 is newer than 3.9). */
@@ -42,13 +45,14 @@ function compareVersions(a: number[], b: number[]): number {
   return 0;
 }
 
-/** Newest model: highest version; on a tie the non-preview one; then by name, for a stable result. */
+/** Newest model: highest version; on a tie the non-preview one, then the shorter id (the plain alias), then by name. */
 function newest(ids: string[]): string {
   return [...ids].sort((a, b) => {
     const byVersion = compareVersions(versionOf(b), versionOf(a));
     if (byVersion !== 0) return byVersion;
     const byPreview = Number(a.includes('preview')) - Number(b.includes('preview'));
-    return byPreview !== 0 ? byPreview : a.localeCompare(b);
+    if (byPreview !== 0) return byPreview;
+    return a.length - b.length || a.localeCompare(b);
   })[0];
 }
 

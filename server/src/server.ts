@@ -34,8 +34,9 @@ export function createApp({ staticDir, registry }: AppOptions = {}) {
     app.get('/api/config', async (_req, res) => {
       try {
         res.json(await registry.getConfig());
-      } catch {
-        // Do not forward error details to the browser (and keep them out of the response body).
+      } catch (error) {
+        // Log only the kind of error; details might contain request data. Nothing goes to the browser.
+        console.warn(`GET /api/config failed: ${error instanceof Error ? error.name : 'unknown error'}`);
         res.status(500).json({ error: 'Config is unavailable' });
       }
     });

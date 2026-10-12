@@ -27,6 +27,12 @@ describe('toLlmError', () => {
     expect(toLlmError('anthropic', timeout).kind).toBe('timeout');
   });
 
+  it('recognises timeouts by class name when the SDK does not set `name` (as the Anthropic SDK does)', () => {
+    class APIConnectionTimeoutError extends Error {}
+
+    expect(toLlmError('anthropic', new APIConnectionTimeoutError('Request timed out.')).kind).toBe('timeout');
+  });
+
   it('maps unknown values to "other"', () => {
     expect(toLlmError('gemini', 'just a string').kind).toBe('other');
     expect(toLlmError('gemini', undefined).kind).toBe('other');
@@ -51,6 +57,12 @@ describe('isAbortError', () => {
   it('recognises the usual abort errors', () => {
     expect(isAbortError(Object.assign(new Error('x'), { name: 'AbortError' }))).toBe(true);
     expect(isAbortError(Object.assign(new Error('x'), { name: 'APIUserAbortError' }))).toBe(true);
+  });
+
+  it('recognises aborts by class name too', () => {
+    class APIUserAbortError extends Error {}
+
+    expect(isAbortError(new APIUserAbortError('Request was aborted.'))).toBe(true);
   });
 
   it('does not treat other errors as aborts', () => {

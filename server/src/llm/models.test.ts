@@ -92,6 +92,13 @@ describe('pickDefaults', () => {
     );
   });
 
+  it('does not let a dated preview or snapshot outrank the plain model of the same version', () => {
+    expect(pickDefaults(['gemini-2.5-flash-lite-preview-09-2025', 'gemini-2.5-flash-lite']).translation).toBe(
+      'gemini-2.5-flash-lite',
+    );
+    expect(pickDefaults(['claude-haiku-4-5-20251001', 'claude-haiku-4-5']).translation).toBe('claude-haiku-4-5');
+  });
+
   it('falls back to flash, then to the newest model, when there is no lite/pro', () => {
     expect(pickDefaults(['gemini-2.5-flash', 'gemini-3.5-flash']).translation).toBe('gemini-3.5-flash');
     expect(pickDefaults(['gemini-3.5-flash', 'other-1']).hint).toBe('gemini-3.5-flash');

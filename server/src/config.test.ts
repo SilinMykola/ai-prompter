@@ -88,6 +88,32 @@ describe('model overrides', () => {
   });
 });
 
+describe('input hygiene', () => {
+  it('matches LLM_PROVIDER ignoring case and spaces', () => {
+    const config = loadConfig({ ...base, ANTHROPIC_API_KEY: 'an', LLM_PROVIDER: ' Anthropic ' });
+
+    expect(config.defaultProvider).toBe('anthropic');
+    expect(config.warnings).toEqual([]);
+  });
+
+  it('removes duplicate models from an override list', () => {
+    expect(loadConfig({ ...base, GEMINI_MODELS: 'a,b,a' }).providers.gemini?.modelOverride).toEqual(['a', 'b']);
+  });
+
+  it('warns about a PORT that is set but unusable, and still uses 8787', () => {
+    for (const port of ['70000', '8o80']) {
+      const config = loadConfig({ ...base, PORT: port });
+
+      expect(config.port).toBe(8787);
+      expect(config.warnings.join(' ')).toMatch(/PORT/);
+    }
+  });
+
+  it('does not warn about an empty PORT', () => {
+    expect(loadConfig({ ...base, PORT: '' }).warnings).toEqual([]);
+  });
+});
+
 describe('ports and Deepgram model', () => {
   it('defaults the port to 8787', () => {
     expect(loadConfig(base).port).toBe(8787);

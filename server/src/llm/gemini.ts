@@ -50,6 +50,7 @@ export function createGeminiProvider({ client }: { client: GeminiClient }): LlmP
     // Some models do not accept that setting: they answer with HTTP 400 before any text.
     const tryMinimal = req.lowLatency === true && !rejectsMinimalThinking.has(req.model);
     let received = false;
+    let rejectionSuspected = false;
 
     try {
       for await (const text of generate(req, tryMinimal)) {
@@ -61,12 +62,20 @@ export function createGeminiProvider({ client }: { client: GeminiClient }): LlmP
       if (isAbortError(error) || req.signal?.aborted) return;
       const retryable = tryMinimal && !received && (error as { status?: number })?.status === 400;
       if (!retryable) throw toLlmError('gemini', error);
-      rejectsMinimalThinking.add(req.model); // remembered: later requests skip the setting
+      rejectionSuspected = true;
     }
 
     // Second and last attempt, without the thinking setting.
     try {
-      yield* generate(req, false);
+      for await (const text of generate(req, false)) {
+        // Only now we know that the setting was the problem (the same request works without
+        // it), so only now remember it: later requests for this model skip the setting.
+        if (rejectionSuspected) {
+          rejectsMinimalThinking.add(req.model);
+          rejectionSuspected = false;
+        }
+        yield text;
+      }
     } catch (error) {
       if (isAbortError(error) || req.signal?.aborted) return;
       throw toLlmError('gemini', error);

@@ -149,6 +149,17 @@ describe('gemini low-latency requests', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('do not remember the rejection when the retry fails with the same 400 (the prompt was the problem)', async () => {
+    const { client, calls } = fakeClient([httpError(400), httpError(400), ['fine']]);
+    const provider = createGeminiProvider({ client });
+
+    await expect(collect(provider.stream({ ...request, lowLatency: true }))).rejects.toBeInstanceOf(LlmError);
+    await collect(provider.stream({ ...request, lowLatency: true }));
+
+    // The third call (first of the second request) still asked for minimal thinking.
+    expect(calls[2].config?.thinkingConfig).toEqual({ thinkingLevel: 'MINIMAL' });
+  });
+
   it('fail with LlmError when the retry fails too', async () => {
     const { client } = fakeClient([httpError(400), httpError(500)]);
 

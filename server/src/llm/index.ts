@@ -50,6 +50,9 @@ export function createRegistry(
     if (providerConfig) providers.set(id, factories[id](providerConfig.apiKey));
   }
 
+  // The last list that was fetched successfully; served again if a later refresh fails.
+  const lastGood = new Map<ProviderId, string[]>();
+
   // The cache stores the *promise*, so simultaneous callers share one request.
   const cache = new Map<ProviderId, { entry: Promise<ModelsEntry> }>();
 
@@ -59,13 +62,17 @@ export function createRegistry(
 
     try {
       const models = await providers.get(id)!.listModels();
-      if (models.length > 0) return { models, expiresAt: now() + MODELS_TTL_MS };
-      log(`${id}: the API returned no usable models, using built-in ones`);
+      if (models.length > 0) {
+        lastGood.set(id, models);
+        return { models, expiresAt: now() + MODELS_TTL_MS };
+      }
+      log(`${id}: the API returned no usable models`);
     } catch (error) {
       // LlmError messages contain the provider and HTTP status only, never keys.
-      log(`${id}: could not list models (${error instanceof Error ? error.message : 'unknown error'}), using built-in ones`);
+      log(`${id}: could not list models (${error instanceof Error ? error.message : 'unknown error'})`);
     }
-    return { models: FALLBACK_MODELS[id], expiresAt: now() + FAILURE_TTL_MS };
+    // Prefer the last good list over the built-in ids, and try again in a minute.
+    return { models: lastGood.get(id) ?? FALLBACK_MODELS[id], expiresAt: now() + FAILURE_TTL_MS };
   }
 
   async function modelsOf(id: ProviderId): Promise<string[]> {

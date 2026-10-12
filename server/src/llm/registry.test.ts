@@ -194,4 +194,22 @@ describe('caching', () => {
     expect(gemini.listModels).toHaveBeenCalledTimes(2);
     expect(info.defaultHintModel).toBe('gemini-3.1-pro-preview');
   });
+
+  it('keeps serving the last good list when a refresh fails', async () => {
+    let healthy = true;
+    const { registry, clock } = setup({
+      geminiModels: async () => {
+        if (!healthy) throw new LlmError('rate_limit', 'gemini request failed: HTTP 429', 429);
+        return ['gemini-3.9-flash-lite', 'gemini-3.9-pro'];
+      },
+    });
+    await registry.getConfig();
+
+    healthy = false;
+    clock.advance(11 * MINUTE);
+    const [info] = (await registry.getConfig()).providers;
+
+    expect(info.models).toEqual(['gemini-3.9-flash-lite', 'gemini-3.9-pro']);
+  });
 });
+
