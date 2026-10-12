@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSession } from './session';
+import { createSession, type SessionDeps } from './session';
 import { fakeConnection, fakeRegistry, fakeStt, types, validStart } from './sessionTestKit';
 
 beforeEach(() => vi.useFakeTimers());
@@ -9,15 +9,18 @@ function setup(overrides: Partial<Parameters<typeof createSession>[0]> = {}) {
   const connection = fakeConnection();
   const stt = fakeStt();
   const log = vi.fn();
+  // The older tests are about recognition, so translation is replaced by a function that does nothing.
+  const translate = vi.fn<NonNullable<SessionDeps['translate']>>(async () => {});
   const session = createSession({
     send: connection.send,
     close: connection.close,
     stt: stt.provider,
     registry: fakeRegistry,
     log,
+    translate,
     ...overrides,
   });
-  return { session, connection, stt, log };
+  return { session, connection, stt, log, translate };
 }
 
 const start = (session: ReturnType<typeof setup>['session'], message: object = validStart) =>
@@ -498,5 +501,216 @@ describe('review fixes', () => {
 
     expect(types(connection.messages)).toEqual(['error', 'status']);
     expect(stt.opened).toHaveLength(1);
+  });
+});
+
+describe('translation in the session', () => {
+  const sentence = (text: string) => final(text);
+
+  it('translates every sentence with the chosen model and the call context', async () => {
+    const { service, translate } = await running();
+
+    service.onResult(sentence('Guten Tag. Wie geht es Ihnen?'));
+
+    expect(translate).toHaveBeenCalledTimes(2);
+    expect(translate.mock.calls[0][0]).toMatchObject({
+      model: 'fast',
+      id: 1,
+      restart: false,
+      provider: fakeRegistry.get('gemini'),
+      context: { callContext: 'CONTEXT-TEXT', previous: [], sentence: 'Guten Tag.' },
+    });
+    expect(translate.mock.calls[1][0]).toMatchObject({
+      id: 2,
+      context: { previous: ['Guten Tag.'], sentence: 'Wie geht es Ihnen?' },
+    });
+  });
+
+  it('starts the second translation without waiting for the first', async () => {
+    const { service, translate } = await running();
+    translate.mockImplementation(() => new Promise(() => {})); // never finishes
+
+    service.onResult(sentence('Eins. Zwei.'));
+
+    expect(translate).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives each sentence the sentences before it as context', async () => {
+    const { service, translate } = await running();
+
+    service.onResult(sentence('S1. S2. S3. S4. S5. S6.'));
+
+    expect(translate.mock.calls[5][0].context.previous).toEqual(['S2.', 'S3.', 'S4.', 'S5.']);
+  });
+
+  it('lets the translator send its messages to the browser', async () => {
+    const { service, translate, connection } = await running();
+    translate.mockImplementation(async (options) => {
+      options.emit({ type: 'translation_delta', id: options.id, delta: 'Привет' });
+      options.emit({ type: 'translation_done', id: options.id });
+    });
+
+    service.onResult(sentence('Hallo.'));
+    await Promise.resolve();
+
+    expect(connection.messages).toContainEqual({ type: 'translation_delta', id: 1, delta: 'Привет' });
+    expect(connection.messages).toContainEqual({ type: 'translation_done', id: 1 });
+  });
+
+  it('never gives the profile to the translator', async () => {
+    const { service, translate } = await running();
+
+    service.onResult(sentence('Hallo.'));
+
+    expect(JSON.stringify(translate.mock.calls.map(([options]) => options.context))).not.toContain('PROFILE-TEXT');
+    expect(JSON.stringify(translate.mock.calls.map(([options]) => options.model))).not.toContain('PROFILE-TEXT');
+  });
+
+  it('restarts the translation of a known sentence on "retranslate", with the same context', async () => {
+    const { session, service, translate } = await running();
+    service.onResult(sentence('Eins. Zwei.'));
+    translate.mockClear();
+
+    await session.onText(JSON.stringify({ type: 'retranslate', id: 2 }));
+
+    expect(translate).toHaveBeenCalledTimes(1);
+    expect(translate.mock.calls[0][0]).toMatchObject({
+      id: 2,
+      restart: true,
+      context: { previous: ['Eins.'], sentence: 'Zwei.' },
+    });
+  });
+
+  it.each([0, 3, -1, 1.5, 'x', null])('ignores "retranslate" for the unknown id %j', async (id) => {
+    const { session, service, translate } = await running();
+    service.onResult(sentence('Eins. Zwei.'));
+    translate.mockClear();
+
+    await session.onText(JSON.stringify({ type: 'retranslate', id }));
+
+    expect(translate).not.toHaveBeenCalled();
+  });
+
+  it('reports a rejected key once per session, however many sentences fail', async () => {
+    const { service, translate, connection } = await running();
+    translate.mockImplementation(async (options) => options.onAuthError?.());
+
+    service.onResult(sentence('Eins. Zwei. Drei.'));
+
+    const errors = connection.messages.filter((m) => m.type === 'error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ message: expect.stringMatching(/ключ/i) });
+  });
+
+  it('gives running translations up to 5 seconds to finish when stopping', async () => {
+    const { session, service, translate, connection } = await running();
+    translate.mockImplementation(async (options) => {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      options.emit({ type: 'translation_done', id: options.id });
+    });
+    service.onResult(sentence('Hallo.'));
+
+    const stopping = session.onText(JSON.stringify({ type: 'stop' }));
+    await vi.advanceTimersByTimeAsync(2000);
+    await stopping;
+
+    const done = connection.messages.findIndex((m) => m.type === 'translation_done');
+    const stopped = connection.messages.findIndex((m) => m.type === 'status' && m.state === 'stopped');
+    expect(done).toBeGreaterThan(-1);
+    expect(done).toBeLessThan(stopped);
+  });
+
+  it('stops after 5 seconds even if a translation never finishes, and cancels it', async () => {
+    const { session, service, translate, connection } = await running();
+    translate.mockImplementation(() => new Promise(() => {}));
+    service.onResult(sentence('Hallo.'));
+    const signal = translate.mock.calls[0][0].signal!;
+
+    const stopping = session.onText(JSON.stringify({ type: 'stop' }));
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(connection.close).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await stopping;
+
+    expect(connection.close).toHaveBeenCalledTimes(1);
+    expect(signal.aborted).toBe(true);
+  });
+
+  it('translates the last sentences that stopping itself flushes', async () => {
+    const { session, service, translate } = await running();
+    service.onResult(sentence('Und dann'));
+    translate.mockClear();
+
+    await session.onText(JSON.stringify({ type: 'stop' }));
+
+    expect(translate).toHaveBeenCalledTimes(1);
+    expect(translate.mock.calls[0][0].context.sentence).toBe('Und dann');
+  });
+
+  it('cancels running translations when the browser disappears', async () => {
+    const { session, service, translate } = await running();
+    translate.mockImplementation(() => new Promise(() => {}));
+    service.onResult(sentence('Hallo.'));
+    const signal = translate.mock.calls[0][0].signal!;
+
+    session.onClose();
+
+    expect(signal.aborted).toBe(true);
+  });
+
+  it('cancels running translations when recognition fails for good', async () => {
+    const { service, translate } = await running();
+    translate.mockImplementation(() => new Promise(() => {}));
+    service.onResult(sentence('Hallo.'));
+    const signal = translate.mock.calls[0][0].signal!;
+
+    service.onFatal({ kind: 'connection', message: 'x' });
+
+    expect(signal.aborted).toBe(true);
+  });
+
+  it('survives a translator that crashes', async () => {
+    const { service, translate, connection } = await running();
+    translate.mockImplementation(async () => {
+      throw new Error('boom');
+    });
+
+    service.onResult(sentence('Hallo.'));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(connection.close).not.toHaveBeenCalled();
+  });
+
+  it('works end to end with the real translator and a fake model', async () => {
+    const modelRequests: string[] = [];
+    const llm = {
+      id: 'gemini',
+      label: 'Gemini',
+      listModels: async () => ['fast', 'strong'],
+      stream: (request: { user: string }) => {
+        modelRequests.push(request.user);
+        return (async function* () {
+          yield 'Добрый ';
+          yield 'день.';
+        })();
+      },
+    };
+    const kit = setup({
+      translate: undefined,
+      registry: { get: () => llm as never, modelsOf: async () => ['fast', 'strong'] },
+    });
+    await start(kit.session);
+    kit.connection.messages.length = 0;
+
+    kit.stt.opened[0].handlers.onResult(sentence('Guten Tag.'));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(kit.connection.messages.filter((m) => m.type.startsWith('translation'))).toEqual([
+      { type: 'translation_delta', id: 1, delta: 'Добрый ' },
+      { type: 'translation_delta', id: 1, delta: 'день.' },
+      { type: 'translation_done', id: 1 },
+    ]);
+    expect(modelRequests[0]).toContain('<sentence>Guten Tag.</sentence>');
+    expect(modelRequests[0]).not.toContain('PROFILE-TEXT');
   });
 });

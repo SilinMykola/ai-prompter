@@ -1,7 +1,9 @@
 import type { ClientMessage, ServerMessage } from '@ai-prompter/shared/protocol';
 import type { Registry } from './llm';
+import type { LlmProvider } from './llm/types';
 import { createSentenceAssembler, type AssemblerOutput } from './sentences';
 import type { SttProvider, SttStream } from './stt/types';
+import { translateSentence, type TranslateOptions } from './translate';
 import { validateStart } from './validateStart';
 
 // One call session: lives as long as one browser WebSocket connection.
@@ -22,6 +24,8 @@ export interface SessionDeps {
   log?(event: string): void;
   /** How long to wait for the first message. */
   startTimeoutMs?: number;
+  /** Translates one sentence. Replaceable in tests. */
+  translate?: (options: TranslateOptions) => Promise<void>;
 }
 
 export interface Session {
@@ -39,17 +43,58 @@ type State = 'waiting' | 'starting' | 'running' | 'ending' | 'done';
 
 const DEFAULT_START_TIMEOUT_MS = 10_000;
 
+// On "stop", translations that are still running get this long to finish.
+const STOP_GRACE_MS = 5000;
+
 export function createSession(deps: SessionDeps): Session {
   const log = deps.log ?? (() => {});
   let state: State = 'waiting';
   let stream: SttStream | undefined;
   const assembler = createSentenceAssembler();
+  const translate = deps.translate ?? translateSentence;
+
+  // What translation needs, known after a valid `start`.
+  let llm: LlmProvider | undefined;
+  let translationModel = '';
+  let callContext = '';
+  // The sentences said so far (index = id - 1): context for the next translations, and for "retranslate".
+  const history: string[] = [];
+  const running = new Set<Promise<void>>(); // translations in progress
+  const cancelTranslations = new AbortController(); // aborted when the session ends
+  let keyErrorReported = false;
+
+  // Starts translating the sentence with this id. Several run at once, nobody waits for another.
+  function startTranslation(id: number, restart = false): void {
+    const sentence = history[id - 1];
+    if (!llm || sentence === undefined) return;
+
+    const job = translate({
+      provider: llm,
+      model: translationModel,
+      id,
+      // The user's personal data (profile) is deliberately not passed on: translation does not need it.
+      context: { callContext, previous: history.slice(Math.max(0, id - 5), id - 1), sentence },
+      emit: send,
+      signal: cancelTranslations.signal,
+      restart,
+      onAuthError() {
+        if (keyErrorReported) return; // one message is enough, even if many sentences fail
+        keyErrorReported = true;
+        send({ type: 'error', message: 'Провайдер языковой модели отклонил ключ API. Проверьте ключ в файле .env.' });
+      },
+      log,
+    }).catch(() => log('session_error translation_crashed'));
+    running.add(job);
+    void job.finally(() => running.delete(job));
+  }
 
   // Sends what the sentence assembler produced: finished sentences first, then the live card text.
   // (This is also where translation will be started for each sentence in a later change.)
   function relay(output: AssemblerOutput): void {
     for (const sentence of output.sentences) {
+      history[sentence.id - 1] = sentence.text;
       send({ type: 'sentence', id: sentence.id, text: sentence.text });
+      startTranslation(sentence.id);
     }
     send({ type: 'interim', finalText: output.finalText, interimText: output.interimText });
   }
@@ -74,6 +119,7 @@ export function createSession(deps: SessionDeps): Session {
     if (state === 'done') return;
     state = 'done';
     clearTimeout(startTimer);
+    cancelTranslations.abort(); // nobody is listening any more
     deps.close();
   }
 
@@ -105,6 +151,9 @@ export function createSession(deps: SessionDeps): Session {
 
       send({ type: 'status', state: 'connecting' });
       log(`session_start provider=${check.start.provider} translation=${check.start.translationModel} hint=${check.start.hintModel}`);
+      llm = deps.registry.get(check.start.provider);
+      translationModel = check.start.translationModel;
+      callContext = check.start.callContext;
       state = 'running'; // before opening: the stream may report a failure at once
       stream = deps.stt.open({ language: check.start.language }, {
         onOpen: () => send({ type: 'status', state: 'listening' }),
@@ -149,6 +198,14 @@ export function createSession(deps: SessionDeps): Session {
     await closeStream();
     if ((state as State) === 'done') return; // the browser left in the meantime
     relay(assembler.pushUtteranceEnd());
+    // Let translations that are still running finish (but not for long): the last sentences are the freshest.
+    let grace: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      Promise.allSettled([...running]),
+      new Promise<void>((resolve) => (grace = setTimeout(resolve, STOP_GRACE_MS))),
+    ]);
+    clearTimeout(grace);
+    if ((state as State) === 'done') return;
     send({ type: 'status', state: 'stopped' });
     finish();
   }
@@ -188,8 +245,12 @@ export function createSession(deps: SessionDeps): Session {
       case 'start':
         send({ type: 'error', message: 'Сессия уже начата.' });
         return;
+      case 'retranslate': {
+        const id = (message as { id?: unknown }).id;
+        if (typeof id === 'number' && Number.isInteger(id)) startTranslation(id, true); // unknown ids are ignored there
+        return;
+      }
       case 'hint':
-      case 'retranslate':
         return; // not implemented yet: accepted and ignored
       default:
         send({ type: 'error', message: 'Непонятное сообщение от страницы.' });
@@ -209,6 +270,7 @@ export function createSession(deps: SessionDeps): Session {
     if (state === 'done') return;
     state = 'done';
     clearTimeout(startTimer);
+    cancelTranslations.abort();
     void closeStream();
   }
 

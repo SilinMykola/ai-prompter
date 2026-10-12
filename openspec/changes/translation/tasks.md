@@ -21,9 +21,9 @@
 
 ## 4. Session integration
 
-- [ ] 4.1 Write failing tests in `server/src/session.test.ts` for translations starting for each sentence in parallel with the right context and settings, `retranslate` for a known and an unknown id, the profile never reaching the provider, a single key error per session, stop waiting for running translations up to five seconds, and browser disconnect aborting them; verify they fail
-- [ ] 4.2 Implement the integration in `server/src/session.ts` and wire the provider lookup; verify the tests pass and the earlier session tests still pass
-- [ ] 4.3 Break the parallelism and the profile exclusion in turn, verify tests fail, restore
+- [x] 4.1 Write failing tests in `server/src/session.test.ts` for translations starting for each sentence in parallel with the right context and settings, `retranslate` for a known and an unknown id, the profile never reaching the provider, a single key error per session, stop waiting for running translations up to five seconds, and browser disconnect aborting them; verify they fail
+- [x] 4.2 Implement the integration in `server/src/session.ts` and wire the provider lookup; verify the tests pass and the earlier session tests still pass
+- [x] 4.3 Break the parallelism and the profile exclusion in turn, verify tests fail, restore
 
 ## 5. Live check and wrap-up
 
