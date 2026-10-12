@@ -1,0 +1,106 @@
+import { useRef } from 'react';
+import type { HintMode, ProviderId } from '@ai-prompter/shared/protocol';
+import { useAutoScroll } from '../hooks/useAutoScroll';
+import { useHotkeys } from '../hooks/useHotkeys';
+import { latestCard, type CallState } from '../lib/callReducer';
+import type { Settings } from '../lib/settings';
+import { LivePhrase } from './LivePhrase';
+import { SentenceCard } from './SentenceCard';
+
+// The screen during a call: a header with the state of the call, a scrolling feed of
+// sentence cards, and the phrase being spoken right now at the bottom.
+
+interface CallScreenProps {
+  state: CallState;
+  settings: Pick<Settings, 'language' | 'provider' | 'translationModel'>;
+  /** A short note that goes away by itself (for example "this card is no longer available"). */
+  notice: string | null;
+  onStop(): void;
+  /** Back to the setup form. */
+  onRestart(): void;
+  onHint(id: number, mode: HintMode): void;
+  onRetranslate(id: number): void;
+}
+
+const STATUS_LABELS: Record<CallState['status'], string> = {
+  idle: 'подключение…',
+  connecting: 'подключение…',
+  listening: 'слушаю',
+  speaking: 'собеседник говорит',
+  reconnecting: 'переподключение…',
+  stopped: 'остановлено',
+};
+
+const LANGUAGE_LABELS: Record<Settings['language'], string> = {
+  de: 'Немецкий',
+  en: 'Английский',
+  multi: 'Авто (DE+EN)',
+};
+
+const PROVIDER_LABELS: Record<ProviderId, string> = { gemini: 'Gemini', anthropic: 'Claude' };
+
+export function CallScreen({ state, settings, notice, onStop, onRestart, onHint, onRetranslate }: CallScreenProps) {
+  const feedRef = useRef<HTMLDivElement>(null);
+  // Re-run the scrolling whenever the cards or the live phrase change.
+  useAutoScroll(feedRef, state);
+
+  const latest = latestCard(state);
+  useHotkeys({
+    onShort: () => latest && onHint(latest.id, 'short'),
+    onDetailed: () => latest && onHint(latest.id, 'detailed'),
+  });
+
+  const stopped = state.status === 'stopped';
+  const showInvitation = !stopped && state.cards.length === 0 && !state.finalText && !state.interimText;
+
+  return (
+    <div className="call">
+      <header className="call__header">
+        <div className="call__bar">
+          <p className="call__status" data-testid="call-status" data-state={state.status}>
+            <span className="call__status-dot" aria-hidden="true" />
+            {STATUS_LABELS[state.status]}
+          </p>
+          {stopped ? (
+            <button type="button" className="button button--primary" onClick={onRestart}>
+              Начать заново
+            </button>
+          ) : (
+            <button type="button" className="button" onClick={onStop}>
+              Стоп
+            </button>
+          )}
+        </div>
+        <p className="call__summary" data-testid="call-summary">
+          <span>{LANGUAGE_LABELS[settings.language]}</span>
+          <span>{PROVIDER_LABELS[settings.provider]}</span>
+          <span>{settings.translationModel}</span>
+        </p>
+        {state.error && (
+          <p className="call__error" role="alert">
+            {state.error}
+          </p>
+        )}
+        {notice && (
+          <p className="call__notice" role="status" aria-label="Заметка">
+            {notice}
+          </p>
+        )}
+      </header>
+
+      <div className="feed" ref={feedRef}>
+        {showInvitation && <p className="feed__empty">Жду речь собеседника…</p>}
+        {state.cards.map((card) => (
+          <SentenceCard
+            key={card.id}
+            card={card}
+            isLatest={card.id === latest?.id}
+            onHint={(mode) => onHint(card.id, mode)}
+            onRetranslate={() => onRetranslate(card.id)}
+          />
+        ))}
+        <LivePhrase finalText={state.finalText} interimText={state.interimText} speaking={state.status === 'speaking'} />
+      </div>
+    </div>
+  );
+}
