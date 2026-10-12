@@ -20,5 +20,5 @@
 
 ## 4. Wrap-up
 
-- [ ] 4.1 Render the floating arrangement check: with a real Chrome (headless is enough to verify that the API exists and the portal renders into a second document if possible), otherwise state clearly what could only be checked by tests; document the feature and its limits in the README and update SPEC.md section 11
-- [ ] 4.2 Run `npm test`, `npm run typecheck`, `npm run build` and the code-review skill; fix findings
+- [x] 4.1 Render the floating arrangement check: with a real Chrome (headless is enough to verify that the API exists and the portal renders into a second document if possible), otherwise state clearly what could only be checked by tests; document the feature and its limits in the README and update SPEC.md section 11
+- [x] 4.2 Run `npm test`, `npm run typecheck`, `npm run build` and the code-review skill; fix findings

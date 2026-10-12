@@ -42,6 +42,12 @@ The prompt gives the model the call context and up to four earlier sentences (as
 
 Known quirk: a small, fast model sometimes adds a bracketed German word that is not in the sentence when the call context makes it likely (for example "Termin" in a doctor's-appointment call).
 
+## Floating window over the call
+
+During a call, the button "Вынести поверх окон" moves the call screen into a small window (420 px wide) that Chrome keeps above all other windows, so it can sit over the video call (Chrome's Document Picture-in-Picture). Move it to an edge of the screen and resize it as you like; Chrome remembers its place. The buttons, scrolling and the keys `1` / `2` work in it when it has the focus. Close it, or press "Вернуть" in the main page, to bring the screen back.
+
+Limits: the window is opaque and cannot be made click-through (browsers do not allow it); the main page with the call must stay open (it can be minimised or in the background, because capture and the connection run there); only Chrome (116 and newer) can do this, and the button is hidden elsewhere. Checked automatically: the API exists in Chrome and refuses without a real click, and everything the app does with the window is covered by tests with a stand-in window. Opening it with a real click has to be tried by hand.
+
 ## Reply hints
 
 "Коротко" suggests one polite answer in at most two sentences, in the language of the question, with its Russian translation; "Подробно" gives a cheat sheet: the gist, three to five short points and a Russian block (for a technical question such as "Wie erstellt man einen Indexer in Magento 2?"). Hints are built only when you press a button (or `1` / `2`), stream into the card, and a new request for the same sentence replaces the old one.
