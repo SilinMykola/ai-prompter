@@ -9,9 +9,9 @@
 
 ## 2. Prompts
 
-- [ ] 2.1 Write failing tests in `server/src/prompts.test.ts` for the system prompt content (interpreter into Russian, translation only, exact names and numbers, German official terms with original in brackets, programming terms left, fragments as they are), the call context and its absence, at most four previous sentences in order, no context section for the first sentence, the sentence inside delimiters with an instruction-like sentence staying inside them, and the profile never appearing; verify they fail
-- [ ] 2.2 Implement `buildTranslationPrompt` in `server/src/prompts.ts`; verify the tests pass
-- [ ] 2.3 Break the four-sentence limit and the delimiters in turn, verify tests fail, restore
+- [x] 2.1 Write failing tests in `server/src/prompts.test.ts` for the system prompt content (interpreter into Russian, translation only, exact names and numbers, German official terms with original in brackets, programming terms left, fragments as they are), the call context and its absence, at most four previous sentences in order, no context section for the first sentence, the sentence inside delimiters with an instruction-like sentence staying inside them, and the profile never appearing; verify they fail
+- [x] 2.2 Implement `buildTranslationPrompt` in `server/src/prompts.ts`; verify the tests pass
+- [x] 2.3 Break the four-sentence limit and the delimiters in turn, verify tests fail, restore
 
 ## 3. Translating a sentence
 
