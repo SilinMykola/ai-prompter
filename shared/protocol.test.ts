@@ -26,6 +26,7 @@ function serverKind(message: ServerMessage): string {
     case 'status':
     case 'interim':
     case 'sentence':
+    case 'translation_start':
     case 'translation_delta':
     case 'translation_done':
     case 'translation_error':
@@ -34,6 +35,7 @@ function serverKind(message: ServerMessage): string {
     case 'hint_done':
     case 'hint_error':
     case 'restart_recorder':
+    case 'notice':
     case 'error':
       return message.type;
     default: {
@@ -75,6 +77,7 @@ describe('server messages', () => {
     { type: 'interim', finalText: 'Guten', interimText: 'Tag' },
     { type: 'sentence', id: 1, text: 'Guten Tag.' },
     { type: 'sentence', id: 2, text: 'Hello.', language: 'en' },
+    { type: 'translation_start', id: 1 },
     { type: 'translation_delta', id: 1, delta: 'Добрый' },
     { type: 'translation_done', id: 1 },
     { type: 'translation_error', id: 1 },
@@ -83,11 +86,12 @@ describe('server messages', () => {
     { type: 'hint_done', id: 1 },
     { type: 'hint_error', id: 1 },
     { type: 'restart_recorder' },
+    { type: 'notice', message: 'Лимит запросов провайдера' },
     { type: 'error', message: 'Что-то пошло не так' },
   ];
 
-  it('covers all 12 message types', () => {
-    expect(new Set(messages.map(serverKind)).size).toBe(12);
+  it('covers all 14 message types', () => {
+    expect(new Set(messages.map(serverKind)).size).toBe(14);
   });
 });
 

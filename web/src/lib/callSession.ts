@@ -94,6 +94,10 @@ export async function startCall(settings: Settings, deps: CallDeps): Promise<Cal
           }
           return;
         }
+        if (message.type === 'notice') {
+          if (!ended) deps.notify(message.message); // a short note, not part of the screen state
+          return;
+        }
         show(message);
       },
       onSessionReady(isReconnect) {

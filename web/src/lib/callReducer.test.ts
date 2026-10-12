@@ -118,6 +118,34 @@ describe('streamed translation', () => {
   });
 });
 
+describe('restarted translation', () => {
+  it('empties the text and goes back to waiting, then builds the new text', () => {
+    const state = run([
+      sentence(1),
+      { type: 'translation_delta', id: 1, delta: 'Добр' },
+      { type: 'translation_start', id: 1 },
+    ]);
+
+    expect(card(state, 1).translation).toEqual({ text: '', state: 'waiting' });
+    expect(card(run([{ type: 'translation_delta', id: 1, delta: 'Новый' }], state), 1).translation).toEqual({
+      text: 'Новый',
+      state: 'streaming',
+    });
+  });
+
+  it('also clears a failed translation', () => {
+    const state = run([sentence(1), { type: 'translation_error', id: 1 }, { type: 'translation_start', id: 1 }]);
+
+    expect(card(state, 1).translation).toEqual({ text: '', state: 'waiting' });
+  });
+
+  it('ignores an unknown card', () => {
+    const before = run([sentence(1)]);
+
+    expect(run([{ type: 'translation_start', id: 9 }], before)).toEqual(before);
+  });
+});
+
 describe('streamed hints', () => {
   it('builds a hint from start, deltas and done', () => {
     const state = run([

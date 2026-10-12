@@ -81,6 +81,10 @@ export function callReducer(state: CallState, action: CallAction): CallState {
         ],
       };
 
+    case 'translation_start':
+      // A new attempt begins: forget the old text (it may be a half-finished one) and wait again.
+      return updateCard(state, action.id, (card) => ({ ...card, translation: { text: '', state: 'waiting' } }));
+
     case 'translation_delta':
       return updateCard(state, action.id, (card) => {
         // A delta after a finished or failed translation means a retry began: start the text over.

@@ -213,6 +213,19 @@ describe('a running call', () => {
   });
 });
 
+describe('notices from the server', () => {
+  it('are shown as a short note, not put into the screen state', async () => {
+    const kit = setup();
+    await startCall(settings, kit.deps);
+    const before = kit.actions.length;
+
+    kit.server.onMessage({ type: 'notice', message: 'Лимит запросов провайдера' });
+
+    expect(kit.notices).toEqual(['Лимит запросов провайдера']);
+    expect(kit.actions).toHaveLength(before);
+  });
+});
+
 describe('ending', () => {
   it('on stop: releases the capture, stops the connection, shows "stopped"', async () => {
     const kit = setup();

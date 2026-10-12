@@ -2,10 +2,10 @@
 
 ## 1. Protocol additions
 
-- [ ] 1.1 Add failing compile-time cases for `translation_start` and `notice` to `shared/protocol.test.ts` (the exhaustive switch and the counts become 14 server messages); verify `npm run typecheck` fails
-- [ ] 1.2 Add the two message types to `shared/protocol.ts` with comments; verify typecheck passes for all workspaces, fixing the exhaustive switches the compiler points at
-- [ ] 1.3 Write failing reducer tests for `translation_start` (empties and goes back to waiting, unknown id ignored) in `web/src/lib/callReducer.test.ts`; implement it in `callReducer.ts`; verify the tests pass
-- [ ] 1.4 Write a failing orchestrator test that a `notice` message goes to `notify` and not to `dispatch` in `web/src/lib/callSession.test.ts`; implement it in `callSession.ts`; verify
+- [x] 1.1 Add failing compile-time cases for `translation_start` and `notice` to `shared/protocol.test.ts` (the exhaustive switch and the counts become 14 server messages); verify `npm run typecheck` fails
+- [x] 1.2 Add the two message types to `shared/protocol.ts` with comments; verify typecheck passes for all workspaces, fixing the exhaustive switches the compiler points at
+- [x] 1.3 Write failing reducer tests for `translation_start` (empties and goes back to waiting, unknown id ignored) in `web/src/lib/callReducer.test.ts`; implement it in `callReducer.ts`; verify the tests pass
+- [x] 1.4 Write a failing orchestrator test that a `notice` message goes to `notify` and not to `dispatch` in `web/src/lib/callSession.test.ts`; implement it in `callSession.ts`; verify
 
 ## 2. Prompts
 

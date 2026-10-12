@@ -83,6 +83,15 @@ export interface SentenceMessage {
   language?: string;
 }
 
+/**
+ * A translation (re)starts: the card's translation text is emptied. Sent before a retry or a
+ * requested re-translation, so pieces of two attempts are never glued together.
+ */
+export interface TranslationStartMessage {
+  type: 'translation_start';
+  id: number;
+}
+
 /** A piece of the translation, streamed as the LLM produces it. */
 export interface TranslationDeltaMessage {
   type: 'translation_delta';
@@ -128,6 +137,12 @@ export interface RestartRecorderMessage {
   type: 'restart_recorder';
 }
 
+/** A short remark that goes away by itself (for example "provider rate limit"), not an error. Russian. */
+export interface NoticeMessage {
+  type: 'notice';
+  message: string;
+}
+
 /** A problem to show to the user. `message` is Russian and human-readable. */
 export interface ErrorMessage {
   type: 'error';
@@ -138,6 +153,7 @@ export type ServerMessage =
   | StatusMessage
   | InterimMessage
   | SentenceMessage
+  | TranslationStartMessage
   | TranslationDeltaMessage
   | TranslationDoneMessage
   | TranslationErrorMessage
@@ -146,6 +162,7 @@ export type ServerMessage =
   | HintDoneMessage
   | HintErrorMessage
   | RestartRecorderMessage
+  | NoticeMessage
   | ErrorMessage;
 
 // ---------------------------------------------------------------------------
