@@ -53,3 +53,12 @@ describe('production static files', () => {
     expect(await health.json()).toEqual({ ok: true });
   });
 });
+
+describe('startup failure', () => {
+  it('rejects when the port is already in use', async () => {
+    const first = await start();
+    const { port } = first.address() as AddressInfo;
+
+    await expect(startServer({ port })).rejects.toMatchObject({ code: 'EADDRINUSE' });
+  });
+});

@@ -18,7 +18,7 @@ Greenfield repository: only SPEC.md, the implementation plan and OpenSpec files 
 ## Decisions
 
 - **npm workspaces, no extra monorepo tool.** Required by SPEC.md. Alternatives (pnpm, turborepo) add tools without benefit at this size.
-- **`shared` consumed as source.** `server` runs through `tsx` and `web` through Vite, both of which compile TypeScript imports from `shared/protocol.ts` directly. `server` build uses `tsc` with a path to `shared`. Alternative (publishing `shared` as a compiled package) adds a build ordering problem for no gain.
+- **`shared` consumed as source.** `server` runs through `tsx` and `web` through Vite, both of which compile TypeScript imports from `shared/protocol.ts` directly. The server has no build step: both `npm run dev` and `npm start` run it through `tsx` (a runtime dependency), which keeps `shared` imports trivial for a local-only app. Alternative (publishing `shared` as a compiled package) adds a build ordering problem for no gain.
 - **Protocol as discriminated unions on `type`.** `ClientMessage` and `ServerMessage` let both sides narrow with a `switch` and get exhaustiveness checks. Alternative: separate interfaces without a union, which loses compile-time exhaustiveness.
 - **Vite port from `WEB_PORT`, default 5175, `strictPort: true`.** 5173 and 5180 are taken by other local apps. `strictPort` makes Vite fail loudly instead of silently moving to another port that the user did not expect. The server port stays `PORT` (8787).
 - **Vite proxy for `/api` and `/ws` (with `ws: true`).** Matches SPEC.md section 2, so the browser talks to one origin in development and production alike.

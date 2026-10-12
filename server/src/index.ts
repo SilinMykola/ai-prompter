@@ -6,11 +6,12 @@ import { startServer } from './server';
 // loadEnvFile throws if the file is missing; that is fine, defaults are used then.
 try {
   process.loadEnvFile(fileURLToPath(new URL('../../.env', import.meta.url)));
-} catch {
-  // no .env yet
+} catch (error) {
+  // A missing file is fine (defaults are used); anything else (permissions, bad syntax) is not.
+  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
 }
 
-const port = Number(process.env.PORT ?? 8787);
+const port = Number(process.env.PORT) || 8787;
 
 // Serve the built web app if `npm run build` has been run (npm start).
 // During `npm run dev` there is no dist folder and Vite serves the page instead.

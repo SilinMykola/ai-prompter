@@ -1,5 +1,5 @@
 import express from 'express';
-import type { Server } from 'node:http';
+import { createServer, type Server } from 'node:http';
 import type { SessionState } from '@ai-prompter/shared/protocol';
 
 // State of a session that has not started yet. Typed from the shared protocol, so a rename
@@ -31,9 +31,12 @@ export function createApp({ staticDir }: { staticDir?: string } = {}) {
 }
 
 // Starts listening and resolves once the socket is open.
+// We create the HTTP server ourselves and wait for its 'listening' / 'error' events:
+// Express's own listen() callback also fires on errors (such as EADDRINUSE).
 export function startServer({ port, staticDir }: { port: number; staticDir?: string }): Promise<Server> {
   return new Promise((resolve, reject) => {
-    const server = createApp({ staticDir }).listen(port, HOST, () => resolve(server));
+    const server = createServer(createApp({ staticDir }));
     server.once('error', reject);
+    server.listen(port, HOST, () => resolve(server));
   });
 }

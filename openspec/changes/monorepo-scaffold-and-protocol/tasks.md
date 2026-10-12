@@ -19,5 +19,5 @@
 
 ## 3. Integration check
 
-- [ ] 3.1 Run `npm test`, `npm run typecheck`, `npm run build` and `npm start` from a clean `node_modules`; verify all exit 0 and `git status` shows no `.env` or build output untracked
-- [ ] 3.2 Review the diff with the code-review skill and fix findings; verify a second pass reports nothing blocking
+- [x] 3.1 Run `npm test`, `npm run typecheck`, `npm run build` and `npm start` from a clean `node_modules`; verify all exit 0 and `git status` shows no `.env` or build output untracked
+- [x] 3.2 Review the diff with the code-review skill and fix findings; verify a second pass reports nothing blocking
