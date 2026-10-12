@@ -24,9 +24,9 @@
 
 ## 5. Audio capture
 
-- [ ] 5.1 Write failing tests in `web/src/lib/audioCapture.test.ts` (fake `getDisplayMedia`, `getUserMedia`, `MediaRecorder`, `MediaStream`) for audio present and absent, audio-only recorder input with the video track left running, recorder options and 250 ms slice, ordered chunk delivery, restart, microphone source, single `onEnded`, clean idempotent stop, and permission errors; verify they fail
-- [ ] 5.2 Implement `createCapture` in `web/src/lib/audioCapture.ts`; verify the tests pass
-- [ ] 5.3 Break the no-audio check and the video-track rule in turn, verify tests fail, restore
+- [x] 5.1 Write failing tests in `web/src/lib/audioCapture.test.ts` (fake `getDisplayMedia`, `getUserMedia`, `MediaRecorder`, `MediaStream`) for audio present and absent, audio-only recorder input with the video track left running, recorder options and 250 ms slice, ordered chunk delivery, restart, microphone source, single `onEnded`, clean idempotent stop, and permission errors; verify they fail
+- [x] 5.2 Implement `createCapture` in `web/src/lib/audioCapture.ts`; verify the tests pass
+- [x] 5.3 Break the no-audio check and the video-track rule in turn, verify tests fail, restore
 
 ## 6. Wrap-up
 
