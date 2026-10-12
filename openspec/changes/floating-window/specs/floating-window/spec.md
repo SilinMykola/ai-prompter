@@ -32,6 +32,17 @@ Pressing the button SHALL open a floating window about 420 px wide, directly fro
 - **WHEN** the browser refuses to open the window
 - **THEN** the call screen stays in the main page and a short note says the window could not be opened
 
+### Requirement: Late or broken windows are cleaned up
+A window that finishes opening after the user already moved on, or that cannot be set up, SHALL be closed instead of left behind, and a failure SHALL be reported on the page above any other short note.
+
+#### Scenario: Moved on while opening
+- **WHEN** the user leaves the call screen while the browser is still opening the window
+- **THEN** the window is closed as soon as it appears and nothing is shown in it
+
+#### Scenario: Setup fails
+- **WHEN** the new window cannot be prepared
+- **THEN** it is closed and the failure note is shown
+
 ### Requirement: The same screen in the floating window
 The floating window SHALL show the same call screen as the main page, with the application's styles, and all of its controls (hint buttons, retry, stop, scrolling) SHALL work inside it.
 

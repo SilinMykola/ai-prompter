@@ -191,3 +191,69 @@ describe('closing', () => {
     expect(win.close).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('review fixes', () => {
+  it('closes a window that finishes opening after close() was called', async () => {
+    let resolve!: (win: Window) => void;
+    const win = fakeFloatingWindow();
+    const api: PipApi = { requestWindow: vi.fn(() => new Promise<Window>((r) => (resolve = r))) };
+    const { result } = renderHook(() => usePipWindow(api));
+    act(() => result.current.open());
+
+    act(() => result.current.close()); // the user moved on while the browser was still opening it
+    await act(async () => resolve(win));
+
+    expect(win.close).toHaveBeenCalledTimes(1);
+    expect(result.current.container).toBeNull();
+  });
+
+  it('can be opened again after a request was cancelled', async () => {
+    let resolveFirst!: (win: Window) => void;
+    const first = fakeFloatingWindow();
+    const second = fakeFloatingWindow();
+    const requestWindow = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<Window>((r) => (resolveFirst = r)))
+      .mockResolvedValue(second);
+    const { result } = renderHook(() => usePipWindow({ requestWindow }));
+    act(() => result.current.open());
+    act(() => result.current.close());
+
+    await act(async () => result.current.open());
+    await act(async () => resolveFirst(first));
+
+    expect(result.current.window).toBe(second);
+    expect(first.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the window and reports a failure when setting it up goes wrong', async () => {
+    const style = document.createElement('style');
+    style.textContent = '.x { color: red; }'; // gives copyStyles something to copy
+    document.head.append(style);
+    const win = fakeFloatingWindow();
+    Object.defineProperty(win.document, 'body', {
+      configurable: true,
+      get() {
+        throw new Error('window is going away');
+      },
+    });
+    const { result } = renderHook(() => usePipWindow({ requestWindow: async () => win }));
+
+    await act(async () => result.current.open());
+
+    expect(win.close).toHaveBeenCalledTimes(1);
+    expect(result.current.failed).toBe(true);
+    expect(result.current.container).toBeNull();
+  });
+
+  it('treats a window that is already closed when it arrives as a failure', async () => {
+    const win = fakeFloatingWindow();
+    Object.defineProperty(win, 'closed', { configurable: true, value: true });
+    const { result } = renderHook(() => usePipWindow({ requestWindow: async () => win }));
+
+    await act(async () => result.current.open());
+
+    expect(result.current.failed).toBe(true);
+    expect(result.current.container).toBeNull();
+  });
+});

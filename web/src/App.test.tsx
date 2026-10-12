@@ -354,6 +354,16 @@ describe('the floating window', () => {
     expect(screen.getByRole('button', { name: 'Стоп' })).toBeInTheDocument();
   });
 
+  it('shows the refusal even when another short note is on screen', async () => {
+    const api: PipApi = { requestWindow: vi.fn(async () => Promise.reject(new DOMException('no', 'NotAllowedError'))) };
+    const view = await callRunning(api);
+    act(() => view.deps.notify('Подсказка недоступна.'));
+
+    await view.user.click(screen.getByRole('button', { name: 'Вынести поверх окон' }));
+
+    expect(await screen.findByText(/Не удалось открыть окно/)).toBeInTheDocument();
+  });
+
   it('closes the floating window when going back to the setup form', async () => {
     const { win, deps, inside } = await popOut();
     act(() => deps.dispatch({ type: 'status', state: 'stopped' }));

@@ -56,12 +56,16 @@ export function usePipWindow(api: PipApi | undefined = browserApi()): UsePipWind
   const [failed, setFailed] = useState(false);
   // Refs hold what the callbacks below need to know without re-creating them on every change.
   const current = useRef<Window | null>(null);
+  // Every request gets a number. `close()` (and unmounting) move the counter on, so an answer that
+  // arrives later sees that it is out of date and closes its window instead of showing it.
+  const requestId = useRef(0);
   const requesting = useRef(false);
-  const gone = useRef(false); // the component was removed
 
   const close = useCallback(() => {
     const win = current.current;
     current.current = null;
+    requestId.current++; // cancels a request that is still waiting for the browser
+    requesting.current = false;
     setPip(null);
     win?.close();
   }, []);
@@ -70,45 +74,61 @@ export function usePipWindow(api: PipApi | undefined = browserApi()): UsePipWind
     if (!api || current.current || requesting.current) return; // unsupported, or already open
     requesting.current = true;
     setFailed(false);
+    const mine = ++requestId.current;
     // First thing, synchronously: the request has to happen inside the click.
     api.requestWindow({ width: WIDTH, height: HEIGHT }).then(
       (win) => {
-        requesting.current = false;
-        if (gone.current) {
-          win.close(); // the page left while the window was opening
+        if (mine !== requestId.current) {
+          win.close(); // the user moved on while the browser was opening it
           return;
         }
-        copyStyles(document, win.document);
-        win.document.title = document.title;
-        const container = win.document.createElement('div');
-        container.className = 'pip-root';
-        win.document.body.append(container);
-        // "pagehide" fires when the user closes the floating window.
-        win.addEventListener('pagehide', () => {
-          if (current.current === win) {
-            current.current = null;
-            setPip(null);
+        requesting.current = false;
+        try {
+          if (win.closed) throw new Error('the floating window was closed while opening');
+          copyStyles(document, win.document);
+          win.document.title = document.title;
+          const container = win.document.createElement('div');
+          container.className = 'pip-root';
+          win.document.body.append(container);
+          current.current = win;
+          setPip({ window: win, container });
+          // "pagehide" fires when the user closes the floating window.
+          win.addEventListener('pagehide', () => {
+            if (current.current === win) {
+              current.current = null;
+              setPip(null);
+            }
+          });
+        } catch {
+          // A window we could not set up is of no use: close it and say that it failed.
+          current.current = null;
+          setPip(null);
+          try {
+            win.close();
+          } catch {
+            // already gone
           }
-        });
-        current.current = win;
-        setPip({ window: win, container });
+          setFailed(true);
+        }
       },
       () => {
+        if (mine !== requestId.current) return;
         requesting.current = false;
         setFailed(true);
       },
     );
   }, [api]);
 
-  // When the component goes away, take the floating window with it.
-  useEffect(() => {
-    gone.current = false;
-    return () => {
-      gone.current = true;
+  // When the component goes away, take the floating window (or a request still on its way) with it.
+  useEffect(
+    () => () => {
+      requestId.current++;
+      requesting.current = false;
       current.current?.close();
       current.current = null;
-    };
-  }, []);
+    },
+    [],
+  );
 
   return { supported: api !== undefined, window: pip?.window ?? null, container: pip?.container ?? null, failed, open, close };
 }

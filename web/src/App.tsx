@@ -104,7 +104,8 @@ export function App({ fetchConfig = defaultFetchConfig, start, storage = browser
       <CallScreen
         state={call.state}
         settings={settings}
-        notice={call.notice ?? (pip.failed ? 'Не удалось открыть окно поверх окон. Нажмите кнопку ещё раз.' : null)}
+        // The refusal comes first: a click that seems to do nothing is worse than a missed hint note.
+        notice={pip.failed ? 'Не удалось открыть окно поверх окон. Нажмите кнопку ещё раз.' : call.notice}
         onStop={() => void call.stop()}
         onRestart={() => {
           pip.close(); // the floating window must not outlive the call screen
