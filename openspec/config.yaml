@@ -20,7 +20,7 @@ rules:
   proposal:
     - State what is out of scope (see section 11 of SPEC.md)
   tasks:
-    - Follow TDD: each implementation task is preceded by a failing test task
+    - "Follow TDD, each implementation task is preceded by a failing test task"
     - After a test passes, break the behaviour once to confirm the test fails, then restore it
   design:
     - Keep server code unaware of which LLM provider is selected

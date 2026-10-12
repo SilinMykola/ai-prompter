@@ -1,0 +1,9 @@
+{
+  "name": "@ai-prompter/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Types shared by server and web. Consumed as TypeScript source, there is no build step.",
+  "exports": { "./protocol": "./protocol.ts" },
+  "scripts": { "typecheck": "tsc -p ." }
+}
