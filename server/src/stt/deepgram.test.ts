@@ -117,3 +117,187 @@ describe('audio forwarding', () => {
     expect(sockets[0].audio).toEqual([chunk(100)]);
   });
 });
+
+const resultMessage = (transcript: string, isFinal: boolean, speechFinal = false) => ({
+  type: 'Results',
+  is_final: isFinal,
+  speech_final: speechFinal,
+  channel: { alternatives: [{ transcript, confidence: 0.9 }] },
+});
+
+describe('recognition events', () => {
+  it('passes interim and final results on with their flags', () => {
+    const { sockets, h } = setup();
+    sockets[0].open();
+
+    sockets[0].receive(resultMessage('Guten Ta', false));
+    sockets[0].receive(resultMessage('Guten Tag.', true, true));
+
+    expect(h.onResult.mock.calls).toEqual([
+      [{ transcript: 'Guten Ta', isFinal: false, speechFinal: false }],
+      [{ transcript: 'Guten Tag.', isFinal: true, speechFinal: true }],
+    ]);
+  });
+
+  it('passes an empty final result on (it can still carry speech_final)', () => {
+    const { sockets, h } = setup();
+    sockets[0].open();
+
+    sockets[0].receive(resultMessage('', true, true));
+
+    expect(h.onResult).toHaveBeenCalledWith({ transcript: '', isFinal: true, speechFinal: true });
+  });
+
+  it('reports an utterance end', () => {
+    const { sockets, h } = setup();
+    sockets[0].open();
+
+    sockets[0].receive({ type: 'UtteranceEnd', channel: [0, 1], last_word_end: 2.4 });
+
+    expect(h.onUtteranceEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores an utterance end with last_word_end -1', () => {
+    const { sockets, h } = setup();
+    sockets[0].open();
+
+    sockets[0].receive({ type: 'UtteranceEnd', channel: [0, 1], last_word_end: -1 });
+
+    expect(h.onUtteranceEnd).not.toHaveBeenCalled();
+  });
+
+  it('reports the start of speech', () => {
+    const { sockets, h } = setup();
+    sockets[0].open();
+
+    sockets[0].receive({ type: 'SpeechStarted', channel: [0, 1], timestamp: 1.2 });
+
+    expect(h.onSpeechStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores messages it does not know and text that is not JSON', () => {
+    const { sockets, h } = setup();
+    sockets[0].open();
+
+    sockets[0].receive({ type: 'Metadata', request_id: 'x' });
+    sockets[0].receive({ type: 'Something new' });
+    sockets[0].receive('this is not json');
+    sockets[0].receive({ type: 'Results' }); // result without a channel
+    sockets[0].receive('null');
+
+    expect(h.onResult).not.toHaveBeenCalled();
+    expect(h.onUtteranceEnd).not.toHaveBeenCalled();
+    expect(h.onFatal).not.toHaveBeenCalled();
+  });
+});
+
+describe('keep-alive', () => {
+  it('sends KeepAlive as a text message after 4 seconds without audio', () => {
+    const { sockets } = setup();
+    sockets[0].open();
+
+    vi.advanceTimersByTime(3999);
+    expect(sockets[0].text).toEqual([]);
+    vi.advanceTimersByTime(1);
+
+    expect(sockets[0].text).toEqual(['{"type":"KeepAlive"}']);
+  });
+
+  it('keeps sending it every 4 seconds of silence', () => {
+    const { sockets } = setup();
+    sockets[0].open();
+
+    vi.advanceTimersByTime(12_000);
+
+    expect(sockets[0].text).toHaveLength(3);
+  });
+
+  it('does not send it while audio keeps flowing', () => {
+    const { stream, sockets } = setup();
+    sockets[0].open();
+
+    for (let i = 0; i < 12; i++) {
+      stream.send(chunk(i));
+      vi.advanceTimersByTime(1000);
+    }
+
+    expect(sockets[0].text).toEqual([]);
+  });
+
+  it('does not wait for the first 4 seconds when audio was sent before the connection opened', () => {
+    const { stream, sockets } = setup();
+    stream.send(chunk(1));
+    vi.advanceTimersByTime(3000);
+    sockets[0].open();
+
+    vi.advanceTimersByTime(3999);
+
+    expect(sockets[0].text).toEqual([]);
+  });
+});
+
+describe('closing', () => {
+  it('sends CloseStream and waits for the service to close the connection', async () => {
+    const { stream, sockets } = setup();
+    sockets[0].open();
+
+    let closed = false;
+    const closing = stream.close().then(() => (closed = true));
+
+    expect(sockets[0].text).toContain('{"type":"CloseStream"}');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(closed).toBe(false);
+
+    sockets[0].drop(1000);
+    await closing;
+    expect(closed).toBe(true);
+  });
+
+  it('still delivers results that arrive while closing', async () => {
+    const { stream, sockets, h } = setup();
+    sockets[0].open();
+    const closing = stream.close();
+
+    sockets[0].receive(resultMessage('Letzte Worte.', true, true));
+    sockets[0].drop(1000);
+    await closing;
+
+    expect(h.onResult).toHaveBeenCalledWith({ transcript: 'Letzte Worte.', isFinal: true, speechFinal: true });
+  });
+
+  it('closes the connection anyway after 2 seconds and then delivers nothing more', async () => {
+    const { stream, sockets, h } = setup();
+    sockets[0].open();
+    const closing = stream.close();
+
+    await vi.advanceTimersByTimeAsync(2000);
+    await closing;
+    sockets[0].receive(resultMessage('too late', true));
+
+    expect(sockets[0].terminateCalls).toBe(1);
+    expect(h.onResult).not.toHaveBeenCalled();
+  });
+
+  it('sends no KeepAlive after closing and does not report a reconnect', async () => {
+    const { stream, sockets, h } = setup();
+    sockets[0].open();
+    const closing = stream.close();
+    sockets[0].drop(1000);
+    await closing;
+
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    expect(sockets[0].text).toEqual(['{"type":"CloseStream"}']);
+    expect(h.onReconnecting).not.toHaveBeenCalled();
+  });
+
+  it('can be closed before the connection opens', async () => {
+    const { stream, sockets } = setup();
+
+    const closing = stream.close();
+    await vi.advanceTimersByTimeAsync(2000);
+    await closing;
+
+    expect(sockets[0].terminateCalls).toBe(1);
+  });
+});

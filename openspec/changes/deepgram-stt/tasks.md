@@ -8,10 +8,10 @@
 
 ## 2. Events, keep-alive and closing
 
-- [ ] 2.1 Write failing tests for result mapping (interim and final flags, first alternative), `UtteranceEnd` mapping and the -1 case, `SpeechStarted`, `KeepAlive` as a text message after 4 seconds of silence and not while audio flows, `CloseStream` on close, results delivered while closing, and the 2-second close timeout; verify they fail
-- [ ] 2.2 Implement message parsing, the keep-alive timer and `close()`; verify the tests pass
-- [ ] 2.3 Make malformed or unknown messages harmless (a test for non-JSON text and an unknown `type`); verify
-- [ ] 2.4 Break the -1 filter and the keep-alive reset in turn, verify the tests fail, restore
+- [x] 2.1 Write failing tests for result mapping (interim and final flags, first alternative), `UtteranceEnd` mapping and the -1 case, `SpeechStarted`, `KeepAlive` as a text message after 4 seconds of silence and not while audio flows, `CloseStream` on close, results delivered while closing, and the 2-second close timeout; verify they fail
+- [x] 2.2 Implement message parsing, the keep-alive timer and `close()`; verify the tests pass
+- [x] 2.3 Make malformed or unknown messages harmless (a test for non-JSON text and an unknown `type`); verify
+- [x] 2.4 Break the -1 filter and the keep-alive reset in turn, verify the tests fail, restore
 
 ## 3. Reconnecting and failures
 
