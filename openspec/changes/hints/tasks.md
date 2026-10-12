@@ -8,9 +8,9 @@
 
 ## 2. Streaming a hint
 
-- [ ] 2.1 Write failing tests in `server/src/hint.test.ts` (fake provider, fake timers) for `hint_start` with the mode first, pieces then `hint_done`, the request parameters (hint model, token limit, no low-latency flag, prompt from the prompts module), an error in the middle giving `hint_error`, an empty answer giving `hint_error`, the 45-second timeout, a rate limit giving a notice and `hint_error`, auth calling the callback and giving `hint_error`, cancellation staying silent, and no text in the log; verify they fail
-- [ ] 2.2 Implement `streamHint` in `server/src/hint.ts`; verify the tests pass
-- [ ] 2.3 Break the timeout and the abort handling in turn, verify tests fail, restore
+- [x] 2.1 Write failing tests in `server/src/hint.test.ts` (fake provider, fake timers) for `hint_start` with the mode first, pieces then `hint_done`, the request parameters (hint model, token limit, no low-latency flag, prompt from the prompts module), an error in the middle giving `hint_error`, an empty answer giving `hint_error`, the 45-second timeout, a rate limit giving a notice and `hint_error`, auth calling the callback and giving `hint_error`, cancellation staying silent, and no text in the log; verify they fail
+- [x] 2.2 Implement `streamHint` in `server/src/hint.ts`; verify the tests pass
+- [x] 2.3 Break the timeout and the abort handling in turn, verify tests fail, restore
 
 ## 3. Session integration
 
