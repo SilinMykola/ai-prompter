@@ -2,9 +2,9 @@
 
 ## 1. Interface and connection
 
-- [ ] 1.1 Define `SttProvider`, `SttStream`, `SttHandlers` and `SocketLike` in `server/src/stt/types.ts`; write failing tests in `server/src/stt/deepgram.test.ts` (fake socket, fake timers) for the URL parameters, no `encoding`/`sample_rate`, key only in the `Authorization` header, chunks forwarded in order and unchanged, chunks held until open and sent in order, and overflow beyond 5 seconds dropping the buffer and asking for a recorder restart; verify they fail
-- [ ] 1.2 Implement `createDeepgramProvider` in `server/src/stt/deepgram.ts` (connection, forwarding, early buffer); verify the tests pass
-- [ ] 1.3 Break the buffer order and the header placement in turn, verify the tests fail, restore
+- [x] 1.1 Define `SttProvider`, `SttStream`, `SttHandlers` and `SocketLike` in `server/src/stt/types.ts`; write failing tests in `server/src/stt/deepgram.test.ts` (fake socket, fake timers) for the URL parameters, no `encoding`/`sample_rate`, key only in the `Authorization` header, chunks forwarded in order and unchanged, chunks held until open and sent in order, and overflow beyond 5 seconds dropping the buffer and asking for a recorder restart; verify they fail
+- [x] 1.2 Implement `createDeepgramProvider` in `server/src/stt/deepgram.ts` (connection, forwarding, early buffer); verify the tests pass
+- [x] 1.3 Break the buffer order and the header placement in turn, verify the tests fail, restore
 
 ## 2. Events, keep-alive and closing
 
