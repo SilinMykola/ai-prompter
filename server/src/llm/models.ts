@@ -72,10 +72,27 @@ export interface DefaultModels {
   hint: string;
 }
 
+/** Generation of a model id: "gemini-3.5-flash-lite" -> "3.5". */
+function generationOf(id: string): string {
+  return versionOf(id).join('.');
+}
+
 export function pickDefaults(ids: string[]): DefaultModels {
   if (ids.length === 0) throw new Error('Cannot pick default models from an empty list');
-  return {
-    translation: newestMatching(ids, [/flash-lite|haiku/, /flash/]),
-    hint: newestMatching(ids, [/pro|sonnet/]),
-  };
+  const translation = newestMatching(ids, [/flash-lite|haiku/, /flash/]);
+
+  // For hints: a bigger model than the one used for translation, but not a risky one.
+  //  - Claude: the newest sonnet.
+  //  - Gemini: the plain flash of the same generation as the translation model (released together
+  //    and settled); the very newest flash is often overloaded or slow to start. Pro models come
+  //    last because they often have no free quota, so as a default they would fail out of the box.
+  const plainFlash = ids.filter((id) => /flash(?!-lite)/.test(id));
+  const sameGeneration = plainFlash.filter((id) => generationOf(id) === generationOf(translation));
+  const hint = /sonnet/.test(ids.join(' '))
+    ? newestMatching(ids, [/sonnet/])
+    : sameGeneration.length > 0
+      ? newest(sameGeneration)
+      : newestMatching(ids, [/flash(?!-lite)/, /pro/]);
+
+  return { translation, hint };
 }

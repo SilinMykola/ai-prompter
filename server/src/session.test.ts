@@ -875,6 +875,23 @@ describe('hints in the session', () => {
     expect(connection.close).toHaveBeenCalledTimes(1);
   });
 
+  it('cancels hints at the start of stopping, while translations are still given time to finish', async () => {
+    const { session, service, hint, translate, connection } = await running();
+    translate.mockImplementation(() => new Promise(() => {}));
+    hint.mockImplementation(() => new Promise(() => {}));
+    service.onResult(sentences('Eins.'));
+    await askHint(session, 1);
+    const hintSignal = hint.mock.calls[0][0].signal!;
+
+    const stopping = session.onText(JSON.stringify({ type: 'stop' }));
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(connection.close).not.toHaveBeenCalled(); // still waiting for the translation
+    expect(hintSignal.aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(5000);
+    await stopping;
+  });
+
   it('cancels hints when the browser disappears', async () => {
     const { session, service, hint } = await running();
     hint.mockImplementation(() => new Promise(() => {}));

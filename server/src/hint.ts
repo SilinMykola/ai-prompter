@@ -5,7 +5,7 @@ import { buildHintPrompt, type HintContext } from './prompts';
 
 // Produces one reply hint and streams it to the browser. A sibling of translate.ts, but simpler:
 // no automatic retry (pressing the button again is the retry), and a longer timeout, because
-// the stronger model used for hints may think for a while before it answers.
+// the model used for hints is a bigger one and may be slower to start.
 
 const HINT_TIMEOUT_MS = 45_000;
 
@@ -49,6 +49,9 @@ export async function streamHint(options: HintOptions): Promise<void> {
       user: prompt.user,
       maxTokens: prompt.maxTokens,
       temperature: prompt.temperature,
+      // "Thinking" counts against the token limit. Without this a model can spend the whole
+      // 200 or 500 tokens thinking and never write the hint (seen with Gemini 3.5 Flash).
+      lowLatency: true,
       signal: cancel,
     })) {
       if (piece === '') continue;

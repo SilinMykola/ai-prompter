@@ -20,5 +20,5 @@
 
 ## 4. Live check and wrap-up
 
-- [ ] 4.1 Run a live check with the real server and Gemini: request a short and a detailed hint (for example for "Wie erstellt man einen Indexer in Magento 2?"), check the short one is at most two sentences plus Russian and the detailed one has the gist, 3-5 points and an "RU:" block, and that the server log has no text
-- [ ] 4.2 Document hints in the README (including that the profile is sent to the model for hints); run `npm test`, `npm run typecheck`, `npm run build` and the code-review skill; fix findings
+- [x] 4.1 Run a live check with the real server and Gemini: request a short and a detailed hint (for example for "Wie erstellt man einen Indexer in Magento 2?"), check the short one is at most two sentences plus Russian and the detailed one has the gist, 3-5 points and an "RU:" block, and that the server log has no text
+- [x] 4.2 Document hints in the README (including that the profile is sent to the model for hints); run `npm test`, `npm run typecheck`, `npm run build` and the code-review skill; fix findings

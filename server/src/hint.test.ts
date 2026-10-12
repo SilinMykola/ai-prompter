@@ -59,7 +59,7 @@ describe('a successful hint', () => {
     ]);
   });
 
-  it.each(['short', 'detailed'] as const)('asks the hint model with the %s prompt and its limits, without the low-latency flag', async (mode) => {
+  it.each(['short', 'detailed'] as const)('asks the hint model with the %s prompt and its limits, with minimal thinking', async (mode) => {
     const { done, requests } = run({ pieces: ['x'] }, { mode });
     await done;
 
@@ -72,7 +72,8 @@ describe('a successful hint', () => {
       maxTokens: prompt.maxTokens,
       temperature: prompt.temperature,
     });
-    expect(requests[0].lowLatency).toBeUndefined();
+    // "Thinking" tokens count against the token limit: without this the model can spend all of it before it writes a word.
+    expect(requests[0].lowLatency).toBe(true);
   });
 
   it('leaves no timer behind', async () => {

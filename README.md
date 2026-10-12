@@ -42,6 +42,14 @@ The prompt gives the model the call context and up to four earlier sentences (as
 
 Known quirk: a small, fast model sometimes adds a bracketed German word that is not in the sentence when the call context makes it likely (for example "Termin" in a doctor's-appointment call).
 
+## Reply hints
+
+"Коротко" suggests one polite answer in at most two sentences, in the language of the question, with its Russian translation; "Подробно" gives a cheat sheet: the gist, three to five short points and a Russian block (for a technical question such as "Wie erstellt man einen Indexer in Magento 2?"). Hints are built only when you press a button (or `1` / `2`), stream into the card, and a new request for the same sentence replaces the old one.
+
+**Privacy note:** hints are the only requests that include your "Мои данные" text (and the call context), so the model can answer for you. Translation never sees it. Nothing is stored by the server, and the server log never contains it.
+
+Notes from live testing: models count "thinking" tokens against the token limit, so requests ask for minimal thinking (Gemini 3.5 flash with the default limits otherwise spends almost everything thinking). The default hint model is the plain flash of the same generation as the translation model; "pro" models are available in the list but often have no free quota (HTTP 429), and the very newest flash models were overloaded or slow to start.
+
 ## The screens
 
 **Setup.** Choose where the sound comes from (a Chrome tab or the microphone), the language (German, English or automatic German + English), the provider and the two models, and optionally describe the call and your own data. Your choices (but not the call description) are remembered in this browser. Pressing "Начать" opens Chrome's share dialog: pick the call tab and tick "Also share tab audio", otherwise the app tells you what to fix.

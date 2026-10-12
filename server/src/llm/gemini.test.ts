@@ -103,12 +103,15 @@ describe('gemini stream', () => {
 });
 
 describe('gemini low-latency requests', () => {
+  const minimal = { thinkingLevel: 'MINIMAL' };
+  const low = { thinkingLevel: 'LOW' };
+
   it('ask for minimal thinking', async () => {
     const { client, calls } = fakeClient([['x']]);
 
     await collect(createGeminiProvider({ client }).stream({ ...request, lowLatency: true }));
 
-    expect(calls[0].config).toMatchObject({ thinkingConfig: { thinkingLevel: 'MINIMAL' } });
+    expect(calls[0].config).toMatchObject({ thinkingConfig: minimal });
   });
 
   it('leave thinking alone for normal requests', async () => {
@@ -119,18 +122,29 @@ describe('gemini low-latency requests', () => {
     expect(calls[0].config?.thinkingConfig).toBeUndefined();
   });
 
-  it('retry once without the setting when the model rejects it, and remember that', async () => {
+  it('try the next thinking level when the model rejects "minimal", and remember what works', async () => {
     const { client, calls } = fakeClient([httpError(400), ['ok'], ['again']]);
     const provider = createGeminiProvider({ client });
 
     expect(await collect(provider.stream({ ...request, lowLatency: true }))).toEqual(['ok']);
     expect(calls).toHaveLength(2);
-    expect(calls[1].config?.thinkingConfig).toBeUndefined();
+    expect(calls[1].config?.thinkingConfig).toEqual(low);
 
-    // The next request for the same model does not even try the setting.
+    // The next request for the same model starts at the level that worked.
     expect(await collect(provider.stream({ ...request, lowLatency: true }))).toEqual(['again']);
     expect(calls).toHaveLength(3);
-    expect(calls[2].config?.thinkingConfig).toBeUndefined();
+    expect(calls[2].config?.thinkingConfig).toEqual(low);
+  });
+
+  it('finally try without any thinking setting when no level is accepted, and remember that', async () => {
+    const { client, calls } = fakeClient([httpError(400), httpError(400), ['ok'], ['again']]);
+    const provider = createGeminiProvider({ client });
+
+    expect(await collect(provider.stream({ ...request, lowLatency: true }))).toEqual(['ok']);
+    expect(calls.map((c) => c.config?.thinkingConfig)).toEqual([minimal, low, undefined]);
+
+    await collect(provider.stream({ ...request, lowLatency: true }));
+    expect(calls[3].config?.thinkingConfig).toBeUndefined();
   });
 
   it('do not retry when the 400 comes after text was already streamed', async () => {
@@ -142,25 +156,24 @@ describe('gemini low-latency requests', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('do not retry a 400 on a request that did not ask for the setting', async () => {
+  it('do not retry a 400 on a request that did not ask for low latency', async () => {
     const { client, calls } = fakeClient([httpError(400)]);
 
     await expect(collect(createGeminiProvider({ client }).stream(request))).rejects.toBeInstanceOf(LlmError);
     expect(calls).toHaveLength(1);
   });
 
-  it('do not remember the rejection when the retry fails with the same 400 (the prompt was the problem)', async () => {
-    const { client, calls } = fakeClient([httpError(400), httpError(400), ['fine']]);
+  it('do not remember anything when every level fails with the same 400 (the prompt was the problem)', async () => {
+    const { client, calls } = fakeClient([httpError(400), httpError(400), httpError(400), ['fine']]);
     const provider = createGeminiProvider({ client });
 
     await expect(collect(provider.stream({ ...request, lowLatency: true }))).rejects.toBeInstanceOf(LlmError);
     await collect(provider.stream({ ...request, lowLatency: true }));
 
-    // The third call (first of the second request) still asked for minimal thinking.
-    expect(calls[2].config?.thinkingConfig).toEqual({ thinkingLevel: 'MINIMAL' });
+    expect(calls[3].config?.thinkingConfig).toEqual(minimal); // the next request starts from the top again
   });
 
-  it('fail with LlmError when the retry fails too', async () => {
+  it('fail with LlmError when a retry fails with another error', async () => {
     const { client } = fakeClient([httpError(400), httpError(500)]);
 
     await expect(collect(createGeminiProvider({ client }).stream({ ...request, lowLatency: true }))).rejects.toMatchObject({

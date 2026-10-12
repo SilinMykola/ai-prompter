@@ -21,13 +21,18 @@ export interface GeminiClient {
   };
 }
 
+// "Thinking" tokens are spent before the first word and count against the token limit, so fast
+// answers ask for as little as possible. Models differ in what they accept (some refuse MINIMAL),
+// hence a ladder: the least thinking first, "no setting at all" last.
+const THINKING_LEVELS = ['MINIMAL', 'LOW', undefined] as const;
+
 export function createGeminiProvider({ client }: { client: GeminiClient }): LlmProvider {
-  // Models that answered "400 invalid argument" to the minimal-thinking setting.
-  // We stop sending it to them (see `stream` below).
-  const rejectsMinimalThinking = new Set<string>();
+  // For each model, the first rung of the ladder worth trying (a model that refused MINIMAL
+  // and accepted LOW starts at LOW next time).
+  const startLevel = new Map<string, number>();
 
   // One call to the service. Yields the text pieces as they arrive.
-  async function* generate(req: LlmRequest, minimalThinking: boolean): AsyncGenerator<string> {
+  async function* generate(req: LlmRequest, level: (typeof THINKING_LEVELS)[number]): AsyncGenerator<string> {
     const pieces = await client.models.generateContentStream({
       model: req.model,
       contents: req.user,
@@ -36,7 +41,7 @@ export function createGeminiProvider({ client }: { client: GeminiClient }): LlmP
         maxOutputTokens: req.maxTokens,
         temperature: req.temperature,
         abortSignal: req.signal,
-        ...(minimalThinking ? { thinkingConfig: { thinkingLevel: 'MINIMAL' } } : {}),
+        ...(level ? { thinkingConfig: { thinkingLevel: level } } : {}),
       },
     });
     for await (const piece of pieces) {
@@ -46,39 +51,25 @@ export function createGeminiProvider({ client }: { client: GeminiClient }): LlmP
   }
 
   async function* stream(req: LlmRequest): AsyncGenerator<string> {
-    // Translation wants the first words fast, so ask for the least "thinking".
-    // Some models do not accept that setting: they answer with HTTP 400 before any text.
-    const tryMinimal = req.lowLatency === true && !rejectsMinimalThinking.has(req.model);
-    let received = false;
-    let rejectionSuspected = false;
+    // Only fast requests use the ladder; others leave thinking to the model.
+    const firstRung = req.lowLatency ? (startLevel.get(req.model) ?? 0) : THINKING_LEVELS.length - 1;
 
-    try {
-      for await (const text of generate(req, tryMinimal)) {
-        received = true;
-        yield text;
-      }
-      return;
-    } catch (error) {
-      if (isAbortError(error) || req.signal?.aborted) return;
-      const retryable = tryMinimal && !received && (error as { status?: number })?.status === 400;
-      if (!retryable) throw toLlmError('gemini', error);
-      rejectionSuspected = true;
-    }
-
-    // Second and last attempt, without the thinking setting.
-    try {
-      for await (const text of generate(req, false)) {
-        // Only now we know that the setting was the problem (the same request works without
-        // it), so only now remember it: later requests for this model skip the setting.
-        if (rejectionSuspected) {
-          rejectsMinimalThinking.add(req.model);
-          rejectionSuspected = false;
+    for (let rung = firstRung; ; rung++) {
+      let received = false;
+      try {
+        for await (const text of generate(req, THINKING_LEVELS[rung])) {
+          // Text arrived at a lower rung than we started at: remember it, the higher ones are refused.
+          if (!received && rung > firstRung) startLevel.set(req.model, rung);
+          received = true;
+          yield text;
         }
-        yield text;
+        return;
+      } catch (error) {
+        if (isAbortError(error) || req.signal?.aborted) return;
+        // "400 invalid argument" before any text: probably the thinking setting. Try the next rung.
+        const rejected = req.lowLatency === true && !received && (error as { status?: number })?.status === 400;
+        if (!rejected || rung === THINKING_LEVELS.length - 1) throw toLlmError('gemini', error);
       }
-    } catch (error) {
-      if (isAbortError(error) || req.signal?.aborted) return;
-      throw toLlmError('gemini', error);
     }
   }
 

@@ -66,11 +66,29 @@ describe('filterClaudeModels', () => {
 });
 
 describe('pickDefaults', () => {
-  it('picks the newest flash-lite for translation and the newest pro for hints (Gemini)', () => {
+  it('picks the newest flash-lite for translation and the newest plain flash for hints (Gemini)', () => {
     expect(pickDefaults(filterGeminiModels(geminiList))).toEqual({
       translation: 'gemini-3.5-flash-lite',
-      hint: 'gemini-3.1-pro-preview',
+      hint: 'gemini-3.5-flash',
     });
+  });
+
+  it('prefers a plain flash to a pro model for hints, because pro often has no free quota', () => {
+    expect(pickDefaults(['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.9-pro']).hint).toBe('gemini-3.5-flash');
+  });
+
+  it('prefers the plain flash of the same generation as the translation model over a newer, less settled one', () => {
+    const ids = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'];
+
+    expect(pickDefaults(ids)).toEqual({ translation: 'gemini-3.5-flash-lite', hint: 'gemini-3.5-flash' });
+  });
+
+  it('takes the newest plain flash when none has the generation of the translation model', () => {
+    expect(pickDefaults(['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash']).hint).toBe('gemini-3.8-flash');
+  });
+
+  it('falls back to pro when there is no plain flash', () => {
+    expect(pickDefaults(['gemini-3.5-flash-lite', 'gemini-3.1-pro-preview']).hint).toBe('gemini-3.1-pro-preview');
   });
 
   it('picks haiku and sonnet for Claude', () => {
