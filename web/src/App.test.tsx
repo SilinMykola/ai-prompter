@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ApiConfig } from '@ai-prompter/shared/protocol';
 import { App } from './App';
 import { CaptureError } from './lib/audioCapture';
 import type { CallDeps, CallHandle } from './lib/callSession';
 import type { StorageLike } from './lib/settings';
+import type { PipApi } from './hooks/usePipWindow';
 
 const config: ApiConfig = {
   defaultProvider: 'gemini',
@@ -24,7 +25,7 @@ function fakeHandle() {
   return { stop: vi.fn(async () => {}), requestHint: vi.fn(), retranslate: vi.fn() } satisfies CallHandle;
 }
 
-function setup(options: { fetchConfig?: () => Promise<ApiConfig>; start?: (...args: any[]) => Promise<CallHandle>; stored?: Record<string, string> } = {}) {
+function setup(options: { fetchConfig?: () => Promise<ApiConfig>; start?: (...args: any[]) => Promise<CallHandle>; stored?: Record<string, string>; pip?: PipApi } = {}) {
   const { storage, data } = memoryStorage(options.stored);
   const handle = fakeHandle();
   let deps: CallDeps | undefined;
@@ -36,7 +37,7 @@ function setup(options: { fetchConfig?: () => Promise<ApiConfig>; start?: (...ar
       }),
   );
   const fetchConfig = options.fetchConfig ?? vi.fn(async () => config);
-  const { unmount } = render(<App fetchConfig={fetchConfig} start={start as never} storage={storage} />);
+  const { unmount } = render(<App fetchConfig={fetchConfig} start={start as never} storage={storage} pipApi={options.pip} />);
   return { unmount, start, handle, data, fetchConfig, user: userEvent.setup(), get deps() { return deps!; } };
 }
 
@@ -231,5 +232,153 @@ describe('review fixes', () => {
     await act(async () => finish(view.handle));
 
     expect(view.handle.stop).toHaveBeenCalledTimes(1);
+  });
+});
+
+// --- the floating window ---
+
+// A stand-in for Chrome's floating window: the window of an iframe, so that it has its own document.
+function fakeFloating() {
+  const iframe = document.createElement('iframe');
+  document.body.append(iframe);
+  const win = iframe.contentWindow!;
+  win.close = vi.fn();
+  const api: PipApi = { requestWindow: vi.fn(async () => win) };
+  const hide = () => win.dispatchEvent(new (win as typeof window).Event('pagehide'));
+  return { api, win, hide, inside: () => within(win.document.body) };
+}
+
+async function callRunning(pip?: PipApi) {
+  const view = setup({ pip });
+  await view.user.click(await screen.findByRole('button', { name: 'Начать' }));
+  await screen.findByRole('button', { name: 'Стоп' });
+  return view;
+}
+
+describe('the floating window', () => {
+  it('offers the button only when the browser supports it', async () => {
+    await callRunning(fakeFloating().api);
+    expect(screen.getByRole('button', { name: 'Вынести поверх окон' })).toBeInTheDocument();
+  });
+
+  it('does not offer it otherwise', async () => {
+    await callRunning(undefined);
+    expect(screen.queryByRole('button', { name: 'Вынести поверх окон' })).not.toBeInTheDocument();
+  });
+
+  it('asks for the window inside the click', async () => {
+    const floating = fakeFloating();
+    await callRunning(floating.api);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Вынести поверх окон' }));
+
+    expect(floating.api.requestWindow).toHaveBeenCalledTimes(1);
+  });
+
+  async function popOut() {
+    const floating = fakeFloating();
+    const view = await callRunning(floating.api);
+    act(() => view.deps.dispatch({ type: 'sentence', id: 1, text: 'Guten Tag.' }));
+    await view.user.click(screen.getByRole('button', { name: 'Вынести поверх окон' }));
+    await screen.findByRole('button', { name: 'Вернуть' });
+    return { ...view, ...floating };
+  }
+
+  it('moves the call screen into the floating window and leaves a note in the main page', async () => {
+    const { inside } = await popOut();
+
+    expect(inside().getByText('Guten Tag.')).toBeInTheDocument();
+    expect(inside().getByRole('button', { name: 'Стоп' })).toBeInTheDocument();
+    expect(screen.queryByText('Guten Tag.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Вернуть' })).toBeInTheDocument();
+  });
+
+  it('shows only one call screen at a time', async () => {
+    const { inside } = await popOut();
+
+    expect(screen.queryAllByTestId('call-status')).toHaveLength(0);
+    expect(inside().getAllByTestId('call-status')).toHaveLength(1);
+  });
+
+  it('keeps the call running: new sentences appear in the floating window', async () => {
+    const { inside, deps } = await popOut();
+
+    act(() => deps.dispatch({ type: 'sentence', id: 2, text: 'Wie geht es Ihnen?' }));
+
+    expect(inside().getByText('Wie geht es Ihnen?')).toBeInTheDocument();
+  });
+
+  it('lets the hint buttons work inside the floating window', async () => {
+    const { inside, handle } = await popOut();
+
+    fireEvent.click(inside().getByRole('button', { name: 'Коротко' }));
+
+    expect(handle.requestHint).toHaveBeenCalledWith(1, 'short');
+  });
+
+  it('hears the keys 1 and 2 pressed in the floating window, not in the main page', async () => {
+    const { win, handle } = await popOut();
+
+    fireEvent.keyDown(document.body, { key: '1' });
+    expect(handle.requestHint).not.toHaveBeenCalled();
+    fireEvent.keyDown(win.document.body, { key: '2' });
+
+    expect(handle.requestHint).toHaveBeenCalledWith(1, 'detailed');
+  });
+
+  it('brings the call screen back, with its sentences, when the user closes the floating window', async () => {
+    const { hide } = await popOut();
+
+    act(() => hide());
+
+    expect(await screen.findByText('Guten Tag.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Вернуть' })).not.toBeInTheDocument();
+  });
+
+  it('brings it back and closes the window on "Вернуть"', async () => {
+    const { user, win } = await popOut();
+
+    await user.click(screen.getByRole('button', { name: 'Вернуть' }));
+
+    expect(win.close).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Guten Tag.')).toBeInTheDocument();
+  });
+
+  it('keeps the call screen in the main page and says so when the browser refuses', async () => {
+    const api: PipApi = { requestWindow: vi.fn(async () => Promise.reject(new DOMException('no', 'NotAllowedError'))) };
+    const view = await callRunning(api);
+
+    await view.user.click(screen.getByRole('button', { name: 'Вынести поверх окон' }));
+
+    expect(await screen.findByText(/Не удалось открыть окно/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Стоп' })).toBeInTheDocument();
+  });
+
+  it('closes the floating window when going back to the setup form', async () => {
+    const { win, deps, inside } = await popOut();
+    act(() => deps.dispatch({ type: 'status', state: 'stopped' }));
+
+    fireEvent.click(await within(win.document.body).findByRole('button', { name: 'Начать заново' }));
+
+    expect(win.close).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole('button', { name: 'Начать' })).toBeInTheDocument();
+    void inside;
+  });
+
+  it('stays open after the call stopped, so the last sentences can still be read', async () => {
+    const { win, deps, inside } = await popOut();
+
+    act(() => deps.dispatch({ type: 'status', state: 'stopped' }));
+
+    expect(win.close).not.toHaveBeenCalled();
+    expect(inside().getByText('Guten Tag.')).toBeInTheDocument();
+  });
+
+  it('closes the floating window when the page goes away', async () => {
+    const { win, unmount } = await popOut();
+
+    unmount();
+
+    expect(win.close).toHaveBeenCalledTimes(1);
   });
 });

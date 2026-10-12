@@ -14,9 +14,9 @@
 
 ## 3. App integration
 
-- [ ] 3.1 Write failing tests in `web/src/App.test.tsx` (fake PiP API with an iframe window) for the button being offered only when supported, opening from the click, the call screen appearing inside the floating window while the main page shows the note and "Вернуть", hint buttons and `1`/`2` working inside the floating window, new sentences appearing there, closing the window and "Вернуть" bringing the screen back with all sentences, a refused window showing a note, and the window closing on "Начать заново", on stop and on unmount; verify they fail
-- [ ] 3.2 Implement the integration in `web/src/App.tsx`, the note and container styles in `web/src/styles.css`; verify the tests pass
-- [ ] 3.3 Break the cleanup on restart and the single-screen rule in turn, verify tests fail, restore
+- [x] 3.1 Write failing tests in `web/src/App.test.tsx` (fake PiP API with an iframe window) for the button being offered only when supported, opening from the click, the call screen appearing inside the floating window while the main page shows the note and "Вернуть", hint buttons and `1`/`2` working inside the floating window, new sentences appearing there, closing the window and "Вернуть" bringing the screen back with all sentences, a refused window showing a note, the window closing on "Начать заново" and on unmount, and staying open after the call stopped so the last sentences can be read; verify they fail
+- [x] 3.2 Implement the integration in `web/src/App.tsx`, the note and container styles in `web/src/styles.css`; verify the tests pass
+- [x] 3.3 Break the cleanup on restart and the single-screen rule in turn, verify tests fail, restore
 
 ## 4. Wrap-up
 

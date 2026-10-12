@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ApiConfig } from '@ai-prompter/shared/protocol';
 import { CallScreen } from './components/CallScreen';
 import { SetupScreen } from './components/SetupScreen';
 import { useCall } from './hooks/useCall';
+import { usePipWindow, type PipApi } from './hooks/usePipWindow';
 import { CaptureError } from './lib/audioCapture';
 import type { startCall } from './lib/callSession';
 import { resolveSettings, saveSettings, type Settings, type StorageLike } from './lib/settings';
@@ -15,6 +17,8 @@ interface AppProps {
   fetchConfig?: () => Promise<ApiConfig>;
   start?: typeof startCall;
   storage?: StorageLike | undefined;
+  /** The browser's floating-window API. Replaceable in tests. */
+  pipApi?: PipApi;
 }
 
 async function defaultFetchConfig(): Promise<ApiConfig> {
@@ -34,7 +38,7 @@ function browserStorage(): StorageLike | undefined {
 
 type Phase = 'loading' | 'load-failed' | 'setup' | 'call';
 
-export function App({ fetchConfig = defaultFetchConfig, start, storage = browserStorage() }: AppProps) {
+export function App({ fetchConfig = defaultFetchConfig, start, storage = browserStorage(), pipApi }: AppProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [config, setConfig] = useState<ApiConfig | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -43,6 +47,7 @@ export function App({ fetchConfig = defaultFetchConfig, start, storage = browser
   // A ref (not state) because two quick clicks can happen before React re-renders.
   const startingNow = useRef(false);
   const call = useCall(start);
+  const pip = usePipWindow(pipApi);
 
   const loadConfig = useCallback(() => {
     setPhase('loading');
@@ -95,17 +100,40 @@ export function App({ fetchConfig = defaultFetchConfig, start, storage = browser
   }
 
   if (phase === 'call') {
-    return (
+    const screen = (
       <CallScreen
         state={call.state}
         settings={settings}
-        notice={call.notice}
+        notice={call.notice ?? (pip.failed ? 'Не удалось открыть окно поверх окон. Нажмите кнопку ещё раз.' : null)}
         onStop={() => void call.stop()}
-        onRestart={() => setPhase('setup')}
+        onRestart={() => {
+          pip.close(); // the floating window must not outlive the call screen
+          setPhase('setup');
+        }}
         onHint={call.requestHint}
         onRetranslate={call.retranslate}
+        onPopOut={pip.supported ? pip.open : undefined}
+        hotkeyWindow={pip.window ?? undefined}
       />
     );
+
+    // While the floating window is open the call screen is drawn there (a "portal" renders React
+    // content into another element, here one inside the other window). Only one screen exists,
+    // so keys and scrolling are never doubled; the main page shows a note with a way back.
+    if (pip.container) {
+      return (
+        <>
+          <div className="message pip-note">
+            <p>Окно суфлёра вынесено поверх окон. Звонок продолжается.</p>
+            <button type="button" className="button button--primary" onClick={pip.close}>
+              Вернуть
+            </button>
+          </div>
+          {createPortal(screen, pip.container)}
+        </>
+      );
+    }
+    return screen;
   }
 
   return <SetupScreen config={config} settings={settings} onChange={setSettings} onStart={handleStart} error={startError} starting={starting} />;

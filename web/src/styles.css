@@ -232,9 +232,17 @@ textarea::placeholder {
 
 .call__bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.call__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .call__status {
@@ -297,6 +305,19 @@ textarea::placeholder {
 .feed__empty {
   margin: 32px 0;
   color: var(--muted);
+}
+
+/* ---------- floating window ---------- */
+
+/* The call screen shown in the floating window fills it. */
+.pip-root {
+  height: 100%;
+}
+
+.pip-note {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
 }
 
 /* ---------- one sentence ---------- */
