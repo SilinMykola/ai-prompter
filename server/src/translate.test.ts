@@ -221,6 +221,40 @@ describe('cancelling', () => {
   });
 });
 
+describe('review fixes', () => {
+  it('counts an answer of only empty pieces as a failure', async () => {
+    const { done, messages } = run([{ pieces: ['', '  '] }, { pieces: ['Да.'] }]);
+    await done;
+
+    expect(types(messages)).toContain('translation_start');
+    expect(messages.at(-1)).toEqual({ type: 'translation_done', id: 7 });
+  });
+
+  it('recognises a timeout even when the provider throws an abort error instead of ending quietly', async () => {
+    const requests: LlmRequest[] = [];
+    const provider = {
+      stream(request: LlmRequest): AsyncIterable<string> {
+        requests.push(request);
+        return (async function* () {
+          if (requests.length === 1) {
+            await new Promise<void>((resolve) => request.signal?.addEventListener('abort', () => resolve()));
+            throw Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+          }
+          yield 'Да.';
+        })();
+      },
+    };
+    const messages: ServerMessage[] = [];
+    const done = translateSentence({ provider, model: 'm', id: 7, context, emit: (m) => void messages.push(m), sleep: async () => {} });
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    await done;
+
+    expect(requests).toHaveLength(2);
+    expect(types(messages)).toEqual(['translation_start', 'translation_delta', 'translation_done']);
+  });
+});
+
 describe('privacy', () => {
   it('logs events but never the sentence or the translation', async () => {
     const log = vi.fn();

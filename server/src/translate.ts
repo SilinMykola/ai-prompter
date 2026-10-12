@@ -60,7 +60,9 @@ export async function translateSentence(options: TranslateOptions): Promise<void
         lowLatency: true, // the first words matter more than perfect wording
         signal: cancel,
       })) {
-        gotText = true;
+        if (piece === '') continue;
+        // Whitespace alone ("…words" + " " + "more…") is part of a text, but it is not a translation.
+        if (piece.trim() !== '') gotText = true;
         emit({ type: 'translation_delta', id, delta: piece });
       }
       // A cancelled stream just ends (it does not throw), so look at why it ended.

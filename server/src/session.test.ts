@@ -669,6 +669,41 @@ describe('translation in the session', () => {
     expect(signal.aborted).toBe(true);
   });
 
+  it('cancels the running translation of a sentence when it is re-requested, so two never mix', async () => {
+    const { session, service, translate } = await running();
+    translate.mockImplementation(() => new Promise(() => {}));
+    service.onResult(sentence('Eins.'));
+    const first = translate.mock.calls[0][0].signal!;
+
+    await session.onText(JSON.stringify({ type: 'retranslate', id: 1 }));
+    const second = translate.mock.calls[1][0].signal!;
+
+    expect(first.aborted).toBe(true);
+    expect(second.aborted).toBe(false);
+  });
+
+  it('does not cancel the translations of other sentences', async () => {
+    const { session, service, translate } = await running();
+    translate.mockImplementation(() => new Promise(() => {}));
+    service.onResult(sentence('Eins. Zwei.'));
+    const other = translate.mock.calls[0][0].signal!;
+
+    await session.onText(JSON.stringify({ type: 'retranslate', id: 2 }));
+
+    expect(other.aborted).toBe(false);
+  });
+
+  it('survives a translator that throws before returning a promise', async () => {
+    const { service, translate, connection } = await running();
+    translate.mockImplementation(() => {
+      throw new Error('sync boom');
+    });
+
+    expect(() => service.onResult(sentence('Eins. Zwei.'))).not.toThrow();
+
+    expect(connection.messages.filter((m) => m.type === 'sentence')).toHaveLength(2); // the relay carries on
+  });
+
   it('survives a translator that crashes', async () => {
     const { service, translate, connection } = await running();
     translate.mockImplementation(async () => {

@@ -73,7 +73,7 @@ After a failure or a ten-second timeout the translation SHALL be restarted once,
 - **THEN** it is stopped and counts as a failure
 
 #### Scenario: Empty answer
-- **WHEN** the model finishes without any text
+- **WHEN** the model finishes without any text, or with only whitespace
 - **THEN** it counts as a failure
 
 ### Requirement: Rate limits
@@ -89,6 +89,20 @@ When the provider rejects the API key the system SHALL send one `error` message 
 #### Scenario: Invalid key
 - **WHEN** several sentences fail because the key is rejected
 - **THEN** the browser receives a single error message about the key
+
+### Requirement: One translation per sentence at a time
+A new translation request for a sentence SHALL cancel the one still running for it, so that texts of two attempts never mix, and SHALL NOT affect other sentences.
+
+#### Scenario: Retry pressed while translating
+- **WHEN** `retranslate` arrives while that sentence's translation is still streaming
+- **THEN** the running one is cancelled and the new one streams
+
+### Requirement: Speech cannot forge the prompt structure
+Angle brackets in the sentence and in the context sentences SHALL be removed before they are placed between the delimiters.
+
+#### Scenario: Closing tag in speech
+- **WHEN** the sentence contains `</sentence>`
+- **THEN** the prompt still contains exactly one opening and one closing sentence tag
 
 ### Requirement: Re-requesting a translation
 A `retranslate` message for a known sentence SHALL restart its translation with `translation_start`, using the same context as the first time; for an unknown sentence it SHALL do nothing.

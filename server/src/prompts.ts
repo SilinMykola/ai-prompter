@@ -22,6 +22,10 @@ export interface Prompt {
 /** How many earlier sentences are shown to the model as context. */
 const CONTEXT_SENTENCES = 4;
 
+// Speech must not be able to close our <sentence> / <context> tags and smuggle in "instructions".
+// Angle brackets never occur in real speech, so removing them costs nothing.
+const withoutTags = (text: string) => text.replace(/[<>]/g, '');
+
 export function buildTranslationPrompt({ callContext, previous, sentence }: TranslationContext): Prompt {
   const context = callContext.trim() || 'not specified';
 
@@ -37,7 +41,7 @@ export function buildTranslationPrompt({ callContext, previous, sentence }: Tran
     `Call context: ${context}`,
   ].join('\n');
 
-  const earlier = previous.slice(-CONTEXT_SENTENCES);
+  const earlier = previous.slice(-CONTEXT_SENTENCES).map(withoutTags);
   const parts: string[] = [];
   if (earlier.length > 0) {
     parts.push(
@@ -48,7 +52,7 @@ export function buildTranslationPrompt({ callContext, previous, sentence }: Tran
       '',
     );
   }
-  parts.push('Translate this sentence:', `<sentence>${sentence}</sentence>`);
+  parts.push('Translate this sentence:', `<sentence>${withoutTags(sentence)}</sentence>`);
 
   return { system, user: parts.join('\n') };
 }

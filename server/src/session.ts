@@ -60,6 +60,7 @@ export function createSession(deps: SessionDeps): Session {
   // The sentences said so far (index = id - 1): context for the next translations, and for "retranslate".
   const history: string[] = [];
   const running = new Set<Promise<void>>(); // translations in progress
+  const controllers = new Map<number, AbortController>(); // the newest translation of each sentence
   const cancelTranslations = new AbortController(); // aborted when the session ends
   let keyErrorReported = false;
 
@@ -68,22 +69,33 @@ export function createSession(deps: SessionDeps): Session {
     const sentence = history[id - 1];
     if (!llm || sentence === undefined) return;
 
-    const job = translate({
-      provider: llm,
-      model: translationModel,
-      id,
-      // The user's personal data (profile) is deliberately not passed on: translation does not need it.
-      context: { callContext, previous: history.slice(Math.max(0, id - 5), id - 1), sentence },
-      emit: send,
-      signal: cancelTranslations.signal,
-      restart,
-      onAuthError() {
-        if (keyErrorReported) return; // one message is enough, even if many sentences fail
-        keyErrorReported = true;
-        send({ type: 'error', message: 'Провайдер языковой модели отклонил ключ API. Проверьте ключ в файле .env.' });
-      },
-      log,
-    }).catch(() => log('session_error translation_crashed'));
+    // A sentence has one translation at a time: a new request replaces the old one, so two never mix.
+    controllers.get(id)?.abort();
+    const mine = new AbortController();
+    controllers.set(id, mine);
+
+    let job: Promise<void>;
+    try {
+      job = translate({
+        provider: llm,
+        model: translationModel,
+        id,
+        // The user's personal data (profile) is deliberately not passed on: translation does not need it.
+        context: { callContext, previous: history.slice(Math.max(0, id - 5), id - 1), sentence },
+        emit: send,
+        signal: AbortSignal.any([cancelTranslations.signal, mine.signal]),
+        restart,
+        onAuthError() {
+          if (keyErrorReported) return; // one message is enough, even if many sentences fail
+          keyErrorReported = true;
+          send({ type: 'error', message: 'Провайдер языковой модели отклонил ключ API. Проверьте ключ в файле .env.' });
+        },
+        log,
+      });
+    } catch (error) {
+      job = Promise.reject(error); // a translator that fails at once is handled like one that fails later
+    }
+    job = job.catch(() => log('session_error translation_crashed'));
     running.add(job);
     void job.finally(() => running.delete(job));
   }
@@ -150,36 +162,41 @@ export function createSession(deps: SessionDeps): Session {
       }
 
       send({ type: 'status', state: 'connecting' });
-      log(`session_start provider=${check.start.provider} translation=${check.start.translationModel} hint=${check.start.hintModel}`);
+      log(
+        `session_start provider=${check.start.provider} translation=${check.start.translationModel} hint=${check.start.hintModel}`,
+      );
       llm = deps.registry.get(check.start.provider);
       translationModel = check.start.translationModel;
       callContext = check.start.callContext;
       state = 'running'; // before opening: the stream may report a failure at once
-      stream = deps.stt.open({ language: check.start.language }, {
-        onOpen: () => send({ type: 'status', state: 'listening' }),
-        onResult: (result) => relay(assembler.pushResult(result)),
-        onUtteranceEnd() {
-          relay(assembler.pushUtteranceEnd());
-          send({ type: 'status', state: 'listening' });
+      stream = deps.stt.open(
+        { language: check.start.language },
+        {
+          onOpen: () => send({ type: 'status', state: 'listening' }),
+          onResult: (result) => relay(assembler.pushResult(result)),
+          onUtteranceEnd() {
+            relay(assembler.pushUtteranceEnd());
+            send({ type: 'status', state: 'listening' });
+          },
+          onSpeechStarted: () => send({ type: 'status', state: 'speaking' }),
+          onReconnecting: () => send({ type: 'status', state: 'reconnecting' }),
+          onRestartRecorder: () => send({ type: 'restart_recorder' }),
+          onFatal(error) {
+            if (state === 'done') return;
+            log(`session_error stt_${error.kind}`);
+            send({
+              type: 'error',
+              message:
+                error.kind === 'auth'
+                  ? 'Сервис распознавания речи отклонил ключ API. Проверьте DEEPGRAM_API_KEY.'
+                  : 'Не удалось подключиться к сервису распознавания речи.',
+            });
+            send({ type: 'status', state: 'stopped' });
+            void closeStream();
+            finish();
+          },
         },
-        onSpeechStarted: () => send({ type: 'status', state: 'speaking' }),
-        onReconnecting: () => send({ type: 'status', state: 'reconnecting' }),
-        onRestartRecorder: () => send({ type: 'restart_recorder' }),
-        onFatal(error) {
-          if (state === 'done') return;
-          log(`session_error stt_${error.kind}`);
-          send({
-            type: 'error',
-            message:
-              error.kind === 'auth'
-                ? 'Сервис распознавания речи отклонил ключ API. Проверьте DEEPGRAM_API_KEY.'
-                : 'Не удалось подключиться к сервису распознавания речи.',
-          });
-          send({ type: 'status', state: 'stopped' });
-          void closeStream();
-          finish();
-        },
-      });
+      );
       // If it failed before open() returned, the stream did not exist yet to be closed.
       if ((state as State) === 'done') void closeStream();
     } catch {
