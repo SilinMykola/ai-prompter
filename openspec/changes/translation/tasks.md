@@ -15,9 +15,9 @@
 
 ## 3. Translating a sentence
 
-- [ ] 3.1 Write failing tests in `server/src/translate.test.ts` (fake provider, fake timers, fake sleep) for streamed pieces then done with the sentence id, the request parameters (model, 300 tokens, temperature 0, low latency, prompt from the prompts module), recovery on the second attempt with `translation_start`, failing twice giving `translation_error`, the 10-second timeout, an empty answer, rate limit giving a notice and a two-second wait, auth giving one error callback, and a session abort ending silently; verify they fail
-- [ ] 3.2 Implement `translateSentence` in `server/src/translate.ts`; verify the tests pass
-- [ ] 3.3 Break the retry limit, the timeout and the abort handling in turn, verify tests fail, restore
+- [x] 3.1 Write failing tests in `server/src/translate.test.ts` (fake provider, fake timers, fake sleep) for streamed pieces then done with the sentence id, the request parameters (model, 300 tokens, temperature 0, low latency, prompt from the prompts module), recovery on the second attempt with `translation_start`, failing twice giving `translation_error`, the 10-second timeout, an empty answer, rate limit giving a notice and a two-second wait, auth giving one error callback, and a session abort ending silently; verify they fail
+- [x] 3.2 Implement `translateSentence` in `server/src/translate.ts`; verify the tests pass
+- [x] 3.3 Break the retry limit, the timeout and the abort handling in turn, verify tests fail, restore
 
 ## 4. Session integration
 
