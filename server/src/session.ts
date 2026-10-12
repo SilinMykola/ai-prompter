@@ -58,6 +58,17 @@ export function createSession(deps: SessionDeps): Session {
     if (state !== 'done') deps.send(message);
   }
 
+  // Closes the recognition stream without ever throwing or leaving a rejected promise behind:
+  // a failing close must not take the whole server down.
+  function closeStream(): Promise<void> {
+    try {
+      return Promise.resolve(stream?.close()).catch(() => log('session_error stt_close_failed'));
+    } catch {
+      log('session_error stt_close_failed');
+      return Promise.resolve();
+    }
+  }
+
   // Ends the session at once: nothing more is sent, the connection to the browser is closed.
   function finish(): void {
     if (state === 'done') return;
@@ -83,42 +94,51 @@ export function createSession(deps: SessionDeps): Session {
     state = 'starting';
     clearTimeout(startTimer);
 
-    const check = await validateStart(message, deps.registry);
-    if ((state as State) !== 'starting') return; // the browser left while we were checking
-    if (!check.ok) {
-      log('session_error invalid_start');
-      fail(check.message);
-      return;
-    }
+    try {
+      const check = await validateStart(message, deps.registry);
+      if ((state as State) !== 'starting') return; // the browser left while we were checking
+      if (!check.ok) {
+        log('session_error invalid_start');
+        fail(check.message);
+        return;
+      }
 
-    send({ type: 'status', state: 'connecting' });
-    log(`session_start provider=${check.start.provider} translation=${check.start.translationModel} hint=${check.start.hintModel}`);
-    stream = deps.stt.open({ language: check.start.language }, {
-      onOpen: () => send({ type: 'status', state: 'listening' }),
-      onResult: (result) => relay(assembler.pushResult(result)),
-      onUtteranceEnd() {
-        relay(assembler.pushUtteranceEnd());
-        send({ type: 'status', state: 'listening' });
-      },
-      onSpeechStarted: () => send({ type: 'status', state: 'speaking' }),
-      onReconnecting: () => send({ type: 'status', state: 'reconnecting' }),
-      onRestartRecorder: () => send({ type: 'restart_recorder' }),
-      onFatal(error) {
-        if (state === 'done') return;
-        log(`session_error stt_${error.kind}`);
-        send({
-          type: 'error',
-          message:
-            error.kind === 'auth'
-              ? 'Сервис распознавания речи отклонил ключ API. Проверьте DEEPGRAM_API_KEY.'
-              : 'Не удалось подключиться к сервису распознавания речи.',
-        });
-        send({ type: 'status', state: 'stopped' });
-        void stream?.close();
-        finish();
-      },
-    });
-    state = 'running';
+      send({ type: 'status', state: 'connecting' });
+      log(`session_start provider=${check.start.provider} translation=${check.start.translationModel} hint=${check.start.hintModel}`);
+      state = 'running'; // before opening: the stream may report a failure at once
+      stream = deps.stt.open({ language: check.start.language }, {
+        onOpen: () => send({ type: 'status', state: 'listening' }),
+        onResult: (result) => relay(assembler.pushResult(result)),
+        onUtteranceEnd() {
+          relay(assembler.pushUtteranceEnd());
+          send({ type: 'status', state: 'listening' });
+        },
+        onSpeechStarted: () => send({ type: 'status', state: 'speaking' }),
+        onReconnecting: () => send({ type: 'status', state: 'reconnecting' }),
+        onRestartRecorder: () => send({ type: 'restart_recorder' }),
+        onFatal(error) {
+          if (state === 'done') return;
+          log(`session_error stt_${error.kind}`);
+          send({
+            type: 'error',
+            message:
+              error.kind === 'auth'
+                ? 'Сервис распознавания речи отклонил ключ API. Проверьте DEEPGRAM_API_KEY.'
+                : 'Не удалось подключиться к сервису распознавания речи.',
+          });
+          send({ type: 'status', state: 'stopped' });
+          void closeStream();
+          finish();
+        },
+      });
+      // If it failed before open() returned, the stream did not exist yet to be closed.
+      if ((state as State) === 'done') void closeStream();
+    } catch {
+      // Details stay out of the log: an error here could mention the user's settings.
+      log('session_error start_failed');
+      if ((state as State) !== 'done') fail('Не удалось начать звонок. Попробуйте ещё раз.');
+      void closeStream();
+    }
   }
 
   // The user pressed "Стоп". Closing the recognition stream may still deliver the last words,
@@ -126,7 +146,7 @@ export function createSession(deps: SessionDeps): Session {
   async function handleStop(): Promise<void> {
     state = 'ending';
     log('session_stop');
-    await stream?.close();
+    await closeStream();
     if ((state as State) === 'done') return; // the browser left in the meantime
     relay(assembler.pushUtteranceEnd());
     send({ type: 'status', state: 'stopped' });
@@ -151,7 +171,13 @@ export function createSession(deps: SessionDeps): Session {
     }
 
     if (state === 'starting') {
-      if (type === 'stop') finish(); // handleStart notices that we are done and opens nothing
+      if (type === 'stop') {
+        // handleStart notices that we are done and opens nothing.
+        send({ type: 'status', state: 'stopped' });
+        finish();
+      } else if (type === 'start') {
+        send({ type: 'error', message: 'Сессия уже начата.' });
+      }
       return;
     }
 
@@ -183,7 +209,7 @@ export function createSession(deps: SessionDeps): Session {
     if (state === 'done') return;
     state = 'done';
     clearTimeout(startTimer);
-    void stream?.close();
+    void closeStream();
   }
 
   return { onText, onBinary, onClose };

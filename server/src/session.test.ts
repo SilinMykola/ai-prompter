@@ -410,3 +410,93 @@ describe('privacy', () => {
     consoleSpies.forEach((spy) => spy.mockRestore());
   });
 });
+
+describe('review fixes', () => {
+  it('is not revived when recognition fails synchronously while opening', async () => {
+    const kit = setup();
+    const closed: string[] = [];
+    kit.stt.provider.open = (_options, handlers) => {
+      handlers.onFatal({ kind: 'auth', message: 'x' }); // fails before open() even returns
+      return { send: () => closed.push('audio'), close: async () => void closed.push('closed') };
+    };
+
+    await start(kit.session);
+    kit.session.onBinary(new Uint8Array([1]));
+    await Promise.resolve();
+
+    expect(types(kit.connection.messages)).toEqual(['status', 'error', 'status']);
+    expect(closed).toEqual(['closed']); // the stream was closed and never got audio
+    expect(kit.connection.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('survives a recognition stream whose close() fails', async () => {
+    const kit = setup();
+    kit.stt.provider.open = () => ({
+      send: () => {},
+      close: () => Promise.reject(new Error('socket error')),
+    });
+    await start(kit.session);
+
+    // An unhandled rejection would fail this test run.
+    kit.session.onClose();
+    await vi.advanceTimersByTimeAsync(0); // let any rejection surface
+  });
+
+  it('tells the user when starting fails unexpectedly', async () => {
+    const failingRegistry = { ...fakeRegistry, modelsOf: () => Promise.reject(new Error('boom')) };
+    const { session, connection, log } = setup({ registry: failingRegistry });
+
+    await start(session);
+
+    expect(connection.messages).toEqual([{ type: 'error', message: expect.stringMatching(/Не удалось начать/) }]);
+    expect(connection.close).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(log.mock.calls)).not.toContain('boom');
+  });
+
+  it('tells the user when opening recognition throws', async () => {
+    const kit = setup();
+    kit.stt.provider.open = () => {
+      throw new Error('cannot open');
+    };
+
+    await start(kit.session);
+
+    expect(types(kit.connection.messages)).toEqual(['status', 'error']); // "connecting" came first
+    expect(kit.connection.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('on stop during the start check, says "stopped" before hanging up', async () => {
+    let release!: () => void;
+    const slowRegistry = {
+      ...fakeRegistry,
+      modelsOf: (id: Parameters<typeof fakeRegistry.modelsOf>[0]) =>
+        new Promise<string[]>((resolve) => (release = () => resolve(fakeRegistry.modelsOf(id)))),
+    };
+    const { session, connection } = setup({ registry: slowRegistry });
+
+    const starting = start(session);
+    await session.onText(JSON.stringify({ type: 'stop' }));
+    release();
+    await starting;
+
+    expect(connection.messages).toEqual([{ type: 'status', state: 'stopped' }]);
+  });
+
+  it('answers a second start during the start check with an error', async () => {
+    let release!: () => void;
+    const slowRegistry = {
+      ...fakeRegistry,
+      modelsOf: (id: Parameters<typeof fakeRegistry.modelsOf>[0]) =>
+        new Promise<string[]>((resolve) => (release = () => resolve(fakeRegistry.modelsOf(id)))),
+    };
+    const { session, connection, stt } = setup({ registry: slowRegistry });
+
+    const starting = start(session);
+    await start(session);
+    release();
+    await starting;
+
+    expect(types(connection.messages)).toEqual(['error', 'status']);
+    expect(stt.opened).toHaveLength(1);
+  });
+});

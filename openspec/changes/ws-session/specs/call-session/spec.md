@@ -95,6 +95,33 @@ Messages that are not valid JSON or have an unknown type SHALL NOT crash the ses
 - **WHEN** a `hint` message arrives
 - **THEN** nothing happens and the session keeps running
 
+### Requirement: Failures never take the server down
+Errors while starting a session, failures to close the recognition stream, a recognition stream that fails while it is being opened, and malformed or hostile connection requests SHALL NOT crash the server or leave a session half alive.
+
+#### Scenario: Start fails unexpectedly
+- **WHEN** checking the settings or opening recognition throws
+- **THEN** the client receives an `error` in Russian, the connection is closed and nothing is logged about the cause beyond an event name
+
+#### Scenario: Recognition fails while opening
+- **WHEN** the recognition stream reports a fatal error before it has finished opening
+- **THEN** the session ends, the stream is closed, and later audio is not forwarded
+
+#### Scenario: Closing the stream fails
+- **WHEN** closing the recognition stream fails
+- **THEN** the failure is logged as an event name only and the server keeps running
+
+#### Scenario: Stop during the start check
+- **WHEN** `stop` arrives while the settings are still being checked
+- **THEN** the client receives `status` `stopped`, the connection is closed and recognition is never opened
+
+#### Scenario: Unparsable request target
+- **WHEN** a connection request has a target that cannot be parsed
+- **THEN** it is refused and the server keeps serving other connections
+
+#### Scenario: Refused client resets the connection
+- **WHEN** a refused client resets its connection
+- **THEN** the server does not crash
+
 ### Requirement: Only local pages may connect
 The server SHALL refuse a WebSocket connection whose `Host` is not `localhost`, `127.0.0.1` or `[::1]`, or whose `Origin` header names a different host than the `Host` header.
 

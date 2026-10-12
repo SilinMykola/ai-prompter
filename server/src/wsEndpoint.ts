@@ -47,6 +47,8 @@ export interface WsDeps {
 }
 
 function refuse(socket: Duplex, status: string): void {
+  // A refused client may reset the connection; an unhandled socket 'error' would crash the server.
+  socket.on('error', () => {});
   socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
   socket.destroy();
 }
@@ -83,7 +85,13 @@ export function attachWsEndpoint(server: Server, deps: WsDeps): void {
 
   // The HTTP server hands us every upgrade request; we only accept /ws from local pages.
   server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
-    const path = new URL(request.url ?? '/', 'http://localhost').pathname;
+    // The request target comes from the network: parsing it must never throw out of this listener.
+    let path = '';
+    try {
+      path = new URL(request.url ?? '/', 'http://localhost').pathname;
+    } catch {
+      return refuse(socket, '400 Bad Request');
+    }
     if (path !== WS_PATH) return refuse(socket, '404 Not Found');
 
     if (!isAllowedRequest({ host: request.headers.host, origin: request.headers.origin })) {

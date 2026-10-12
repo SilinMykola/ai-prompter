@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
+import { EventEmitter } from 'node:events';
+import net from 'node:net';
+import { PassThrough } from 'node:stream';
 import WebSocket from 'ws';
 import type { ServerMessage } from '@ai-prompter/shared/protocol';
 import { startServer } from './server';
 import { fakeRegistry, fakeStt, validStart } from './sessionTestKit';
-import { isAllowedRequest } from './wsEndpoint';
+import { attachWsEndpoint, isAllowedRequest } from './wsEndpoint';
 
 const servers: Server[] = [];
 const sockets: WebSocket[] = [];
@@ -154,5 +157,35 @@ describe('/ws endpoint', () => {
     socket.send(new Uint8Array(1024 * 1024 + 1));
 
     expect(await closed).toBe(1009);
+  });
+});
+
+describe('hostile requests do not crash the server', () => {
+  it('survives an upgrade request with an unparsable target', async () => {
+    const { port } = await startWithStt();
+
+    // A raw TCP client, so that we control the exact bytes of the request line.
+    const reply = await new Promise<string>((resolve) => {
+      const socket = net.connect(port, '127.0.0.1', () => {
+        socket.write('GET //[ HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n');
+      });
+      let data = '';
+      socket.on('data', (d) => (data += d));
+      socket.on('close', () => resolve(data));
+      socket.on('error', () => resolve(data));
+    });
+
+    expect(reply).not.toContain('101'); // never upgraded
+    expect((await tryConnect(port)).ok).toBe(true); // and the server still works
+  });
+
+  it('survives a socket error on a refused connection', () => {
+    const server = new EventEmitter();
+    attachWsEndpoint(server as never, { stt: fakeStt().provider, registry: fakeRegistry });
+    const socket = new PassThrough();
+
+    server.emit('upgrade', { url: '/other', headers: {} }, socket, Buffer.alloc(0));
+
+    expect(() => socket.emit('error', new Error('ECONNRESET'))).not.toThrow();
   });
 });
