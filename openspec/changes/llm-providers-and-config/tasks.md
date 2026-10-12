@@ -25,9 +25,9 @@
 
 ## 4. Registry, validation and endpoint
 
-- [ ] 4.1 Update `shared/protocol.ts` and `shared/protocol.test.ts` so provider info carries `defaultTranslationModel` and `defaultHintModel`; verify `npm run typecheck` fails first on the test, then passes
-- [ ] 4.2 Write failing tests in `server/src/llm/registry.test.ts` for providers without keys being absent, override lists, fallback when listing fails, ten-minute caching and the short failure cache (fake clock), defaults inside the model list; verify they fail
-- [ ] 4.3 Implement `createRegistry` in `server/src/llm/index.ts`; verify the tests pass
-- [ ] 4.4 Write failing tests in `server/src/validateStart.test.ts` for unavailable provider, unknown translation model, unknown hint model and a valid start; implement `validateStart` in `server/src/validateStart.ts`; verify they pass
-- [ ] 4.5 Write a failing test that `GET /api/config` returns the registry's config without secrets; wire the registry into `createApp`/`startServer` and `index.ts`; verify it passes and `curl 127.0.0.1:8787/api/config` against the real `.env` shows Gemini with sensible defaults and no keys
-- [ ] 4.6 Break the cache and `validateStart` in turn, verify tests fail, restore; update `.env.example` and the README (providers, optional model overrides, fallback ids, the deviation from SPEC.md); run `npm test`, `npm run typecheck`, and the code-review skill, and fix findings
+- [x] 4.1 Update `shared/protocol.ts` and `shared/protocol.test.ts` so provider info carries `defaultTranslationModel` and `defaultHintModel`; verify `npm run typecheck` fails first on the test, then passes
+- [x] 4.2 Write failing tests in `server/src/llm/registry.test.ts` for providers without keys being absent, override lists, fallback when listing fails, ten-minute caching and the short failure cache (fake clock), defaults inside the model list; verify they fail
+- [x] 4.3 Implement `createRegistry` in `server/src/llm/index.ts`; verify the tests pass
+- [x] 4.4 Write failing tests in `server/src/validateStart.test.ts` for unavailable provider, unknown translation model, unknown hint model and a valid start; implement `validateStart` in `server/src/validateStart.ts`; verify they pass
+- [x] 4.5 Write a failing test that `GET /api/config` returns the registry's config without secrets; wire the registry into `createApp`/`startServer` and `index.ts`; verify it passes and `curl 127.0.0.1:8787/api/config` against the real `.env` shows Gemini with sensible defaults and no keys
+- [x] 4.6 Break the cache and `validateStart` in turn, verify tests fail, restore; update `.env.example` and the README (providers, optional model overrides, fallback ids, the deviation from SPEC.md); run `npm test`, `npm run typecheck`, and the code-review skill, and fix findings

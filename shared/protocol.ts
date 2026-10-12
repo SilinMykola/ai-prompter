@@ -155,7 +155,12 @@ export type ServerMessage =
 export interface ProviderInfo {
   id: ProviderId;
   label: string;
+  /** Chat models the provider offers right now. */
   models: string[];
+  /** Preselected model for translating sentences (fast). Always one of `models`. */
+  defaultTranslationModel: string;
+  /** Preselected model for reply hints (strong). Always one of `models`. */
+  defaultHintModel: string;
 }
 
 /** Public configuration. Never contains API keys. */

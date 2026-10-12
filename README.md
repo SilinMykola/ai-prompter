@@ -34,6 +34,21 @@ Call tab (Chrome) --getDisplayMedia--> web (React) --WebSocket /ws--> server (No
 
 The server listens on `127.0.0.1` only. API keys stay on the server.
 
+## LLM providers and models
+
+The app supports Gemini and Claude behind one interface (`server/src/llm/`). A provider is available only if its API key is set; one key is enough. `LLM_PROVIDER` chooses the default and falls back to the first available provider (Gemini, then Claude).
+
+Models are not listed in `.env`: at startup the server asks each provider's API for its models, keeps the text chat models (no speech, image, music or agent models), and preselects a fast model for translation (newest "flash-lite" / "haiku") and a stronger one for hints (newest "pro" / "sonnet"). The lists are cached for ten minutes. If the API cannot be asked, built-in model ids are used.
+
+To pin the models yourself, set `GEMINI_MODELS` or `ANTHROPIC_MODELS` to a comma-separated list: exactly those are offered, the first is the translation default and the second the hint default.
+
+Differences from SPEC.md:
+
+- Models come from the provider APIs, not from `GEMINI_MODELS` / `ANTHROPIC_MODELS` (those are optional overrides).
+- Fallback Claude ids are `claude-haiku-5-5` / `claude-sonnet-5-5` (the newest known) instead of `claude-haiku-4-5-20251001`.
+- `GET /api/config` also returns `defaultTranslationModel` and `defaultHintModel` per provider.
+- On the free Gemini tier, "pro" models may answer with a rate-limit error (HTTP 429); pick a flash model for hints in that case.
+
 ## WebSocket protocol
 
 Defined once in [shared/protocol.ts](shared/protocol.ts) and imported by both sides. One socket (`/ws`) is one call session. Audio chunks are sent as binary frames; everything else is JSON with a `type` field.
@@ -64,7 +79,7 @@ Server to client:
 | `restart_recorder`  | none (client restarts `MediaRecorder` after a reconnect)            |
 | `error`             | `message` (Russian, human-readable)                                 |
 
-`GET /api/config` returns `{ defaultProvider, providers: [{ id, label, models }] }` and never contains keys.
+`GET /api/config` returns `{ defaultProvider, providers: [{ id, label, models, defaultTranslationModel, defaultHintModel }] }` and never contains keys.
 
 ## Screenshot
 

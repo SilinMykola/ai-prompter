@@ -4,6 +4,8 @@ import type { Server } from 'node:http';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { ApiConfig } from '@ai-prompter/shared/protocol';
+import type { Registry } from './llm';
 import { startServer } from './server';
 
 // Servers started by a test are closed afterwards so the test run can exit.
@@ -13,8 +15,8 @@ afterEach(async () => {
 });
 
 // Port 0 asks the OS for any free port, so tests never clash with a running dev server.
-async function start(staticDir?: string): Promise<Server> {
-  const server = await startServer({ port: 0, staticDir });
+async function start(staticDir?: string, registry?: Pick<Registry, 'getConfig'>): Promise<Server> {
+  const server = await startServer({ port: 0, staticDir, registry });
   started.push(server);
   return server;
 }
@@ -60,5 +62,38 @@ describe('startup failure', () => {
     const { port } = first.address() as AddressInfo;
 
     await expect(startServer({ port })).rejects.toMatchObject({ code: 'EADDRINUSE' });
+  });
+});
+
+describe('GET /api/config', () => {
+  const config: ApiConfig = {
+    defaultProvider: 'gemini',
+    providers: [
+      { id: 'gemini', label: 'Gemini', models: ['a', 'b'], defaultTranslationModel: 'a', defaultHintModel: 'b' },
+    ],
+  };
+
+  it('returns the registry config as JSON', async () => {
+    const server = await start(undefined, { getConfig: async () => config });
+    const { port } = server.address() as AddressInfo;
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/config`);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(config);
+  });
+
+  it('answers 500 with a plain message when the registry fails, without details', async () => {
+    const server = await start(undefined, {
+      getConfig: async () => {
+        throw new Error('secret-detail');
+      },
+    });
+    const { port } = server.address() as AddressInfo;
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/config`);
+
+    expect(res.status).toBe(500);
+    expect(await res.text()).not.toContain('secret-detail');
   });
 });

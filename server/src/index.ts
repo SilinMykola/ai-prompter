@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ConfigError, loadConfig } from './config';
+import { createRegistry } from './llm';
+import { realFactories } from './llm/factories';
 import { startServer } from './server';
 
 // Settings live in the .env file in the repository root (two levels up from this file).
@@ -28,5 +30,6 @@ for (const warning of config.warnings) console.warn(`warning: ${warning}`);
 // Serve the built web app if `npm run build` has been run (npm start).
 // During `npm run dev` there is no dist folder and Vite serves the page instead.
 const distDir = fileURLToPath(new URL('../../web/dist', import.meta.url));
-await startServer({ port: config.port, staticDir: existsSync(distDir) ? distDir : undefined });
+const registry = createRegistry(config, realFactories);
+await startServer({ port: config.port, staticDir: existsSync(distDir) ? distDir : undefined, registry });
 console.log(`server listening on http://127.0.0.1:${config.port}`);

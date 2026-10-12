@@ -95,8 +95,17 @@ describe('api config', () => {
   it('has a default provider and providers with models', () => {
     const config: ApiConfig = {
       defaultProvider: 'gemini',
-      providers: [{ id: 'gemini', label: 'Gemini', models: ['a', 'b'] }],
+      providers: [
+        {
+          id: 'gemini',
+          label: 'Gemini',
+          models: ['a', 'b'],
+          defaultTranslationModel: 'a',
+          defaultHintModel: 'b',
+        },
+      ],
     };
     expect(config.providers[0].models).toHaveLength(2);
+    expect(config.providers[0].defaultHintModel).toBe('b');
   });
 });

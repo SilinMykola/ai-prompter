@@ -1,6 +1,7 @@
 import express from 'express';
 import { createServer, type Server } from 'node:http';
 import type { SessionState } from '@ai-prompter/shared/protocol';
+import type { Registry } from './llm';
 
 // State of a session that has not started yet. Typed from the shared protocol, so a rename
 // in shared/protocol.ts breaks the server build instead of silently drifting apart.
@@ -14,13 +15,31 @@ export const HOST = '127.0.0.1';
 // That split makes the app easy to test: a test can start it on any free port.
 // `staticDir` is the folder with the built web app. In development it is not passed,
 // because Vite serves the page itself.
-export function createApp({ staticDir }: { staticDir?: string } = {}) {
+export interface AppOptions {
+  staticDir?: string;
+  /** Provides the public configuration for GET /api/config. */
+  registry?: Pick<Registry, 'getConfig'>;
+}
+
+export function createApp({ staticDir, registry }: AppOptions = {}) {
   const app = express();
 
   // Placeholder route that proves the server and the Vite proxy are wired up.
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
   });
+
+  // What the browser needs to build the setup screen: providers and models, never keys.
+  if (registry) {
+    app.get('/api/config', async (_req, res) => {
+      try {
+        res.json(await registry.getConfig());
+      } catch {
+        // Do not forward error details to the browser (and keep them out of the response body).
+        res.status(500).json({ error: 'Config is unavailable' });
+      }
+    });
+  }
 
   // Production: this same process also serves the built React app (one process, one port).
   if (staticDir) {
@@ -33,9 +52,9 @@ export function createApp({ staticDir }: { staticDir?: string } = {}) {
 // Starts listening and resolves once the socket is open.
 // We create the HTTP server ourselves and wait for its 'listening' / 'error' events:
 // Express's own listen() callback also fires on errors (such as EADDRINUSE).
-export function startServer({ port, staticDir }: { port: number; staticDir?: string }): Promise<Server> {
+export function startServer({ port, ...options }: AppOptions & { port: number }): Promise<Server> {
   return new Promise((resolve, reject) => {
-    const server = createServer(createApp({ staticDir }));
+    const server = createServer(createApp(options));
     server.once('error', reject);
     server.listen(port, HOST, () => resolve(server));
   });
