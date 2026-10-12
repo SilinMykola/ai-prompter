@@ -34,6 +34,14 @@ Call tab (Chrome) --getDisplayMedia--> web (React) --WebSocket /ws--> server (No
 
 The server listens on `127.0.0.1` only. API keys stay on the server.
 
+## The screens
+
+**Setup.** Choose where the sound comes from (a Chrome tab or the microphone), the language (German, English or automatic German + English), the provider and the two models, and optionally describe the call and your own data. Your choices (but not the call description) are remembered in this browser. Pressing "Начать" opens Chrome's share dialog: pick the call tab and tick "Also share tab audio", otherwise the app tells you what to fix.
+
+**Call.** The header shows what the app is doing and a stop button. Each sentence of the other person gets an entry: the original in large type, its translation below, and the buttons "Коротко" / "Подробно" for a reply hint. Keys `1` and `2` do the same for the newest sentence (not while you type in a field). The phrase being spoken right now is shown at the bottom, its uncertain part in grey. The list follows new text until you scroll up, and resumes when you scroll back to the bottom. The layout works from 420 px wide, so it fits in a window next to the call.
+
+If the connection to the server drops, the app reconnects up to 5 times (the sentences already on screen stay; their unfinished translations are marked as failed). After that, or when the server ends the session, use "Начать заново".
+
 ## Call session (`/ws`)
 
 One WebSocket connection is one call. The first message must be a valid `start`; the server then opens a Deepgram stream, forwards audio, and sends back `status`, `interim` (the live phrase) and `sentence` messages. `stop` (or closing the tab) ends the session, delivering the last words first. Hints and re-translation are accepted but not implemented yet.
