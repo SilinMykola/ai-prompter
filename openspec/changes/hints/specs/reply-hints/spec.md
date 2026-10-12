@@ -53,6 +53,10 @@ A hint request SHALL contain the call context, the user's data, up to six earlie
 - **WHEN** the sentence contains `</sentence>`
 - **THEN** the prompt still has exactly one opening and one closing sentence tag
 
+#### Scenario: User data stays in its own block
+- **WHEN** the user's data contains angle brackets or text that looks like instructions
+- **THEN** it appears between its own tags with the brackets removed, and the prompt has exactly one opening and one closing tag for it
+
 ### Requirement: Models and settings
 Hints SHALL use the session's hint model; translation requests SHALL still never contain the user's data.
 

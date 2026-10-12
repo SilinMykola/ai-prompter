@@ -36,6 +36,6 @@ For each provider the registry SHALL choose a default translation model (the new
 - **WHEN** the offered models include `gemini-3.5-flash` and `gemini-3.9-pro`
 - **THEN** the default hint model is `gemini-3.5-flash`
 
-#### Scenario: Pro as the last resort
-- **WHEN** the offered models include `gemini-3.5-flash-lite` and `gemini-3.1-pro-preview` only
+#### Scenario: Pro for hints
+- **WHEN** the offered models include `gemini-3.5-flash-lite` and `gemini-3.1-pro-preview` only, with no plain flash model
 - **THEN** the default hint model is `gemini-3.1-pro-preview`

@@ -51,6 +51,15 @@ export function latestCard(state: CallState): Card | undefined {
   return state.cards.at(-1);
 }
 
+// A card whose translation or hint was still in progress: mark those parts as failed (the text so far stays).
+function failUnfinished(card: Card): Card {
+  return {
+    ...card,
+    translation: card.translation.state === 'done' ? card.translation : { ...card.translation, state: 'error' },
+    hint: card.hint && card.hint.state === 'streaming' ? { ...card.hint, state: 'error' } : card.hint,
+  };
+}
+
 // Returns a copy of the state where the card with `id` is replaced by `change(card)`.
 // If there is no such card the state is returned as it was (nothing to update).
 function updateCard(state: CallState, id: number, change: (card: Card) => Card): CallState {
@@ -61,6 +70,8 @@ function updateCard(state: CallState, id: number, change: (card: Card) => Card):
 export function callReducer(state: CallState, action: CallAction): CallState {
   switch (action.type) {
     case 'status':
+      // When the call is over, whatever was still arriving never will: show it as failed instead of loading forever.
+      if (action.state === 'stopped') return { ...state, status: 'stopped', cards: state.cards.map(failUnfinished) };
       return { ...state, status: action.state };
 
     case 'interim':
@@ -97,10 +108,16 @@ export function callReducer(state: CallState, action: CallAction): CallState {
       return updateCard(state, action.id, (card) => ({ ...card, translation: { ...card.translation, state: 'done' } }));
 
     case 'translation_error':
-      return updateCard(state, action.id, (card) => ({ ...card, translation: { ...card.translation, state: 'error' } }));
+      return updateCard(state, action.id, (card) => ({
+        ...card,
+        translation: { ...card.translation, state: 'error' },
+      }));
 
     case 'hint_start':
-      return updateCard(state, action.id, (card) => ({ ...card, hint: { mode: action.mode, text: '', state: 'streaming' } }));
+      return updateCard(state, action.id, (card) => ({
+        ...card,
+        hint: { mode: action.mode, text: '', state: 'streaming' },
+      }));
 
     case 'hint_delta':
       return updateCard(state, action.id, (card) =>
@@ -108,10 +125,14 @@ export function callReducer(state: CallState, action: CallAction): CallState {
       );
 
     case 'hint_done':
-      return updateCard(state, action.id, (card) => (card.hint ? { ...card, hint: { ...card.hint, state: 'done' } } : card));
+      return updateCard(state, action.id, (card) =>
+        card.hint ? { ...card, hint: { ...card.hint, state: 'done' } } : card,
+      );
 
     case 'hint_error':
-      return updateCard(state, action.id, (card) => (card.hint ? { ...card, hint: { ...card.hint, state: 'error' } } : card));
+      return updateCard(state, action.id, (card) =>
+        card.hint ? { ...card, hint: { ...card.hint, state: 'error' } } : card,
+      );
 
     case 'error':
       return { ...state, error: action.message };
@@ -124,12 +145,7 @@ export function callReducer(state: CallState, action: CallAction): CallState {
         finalText: '',
         interimText: '',
         error: null,
-        cards: state.cards.map((card) => ({
-          ...card,
-          translation:
-            card.translation.state === 'done' ? card.translation : { ...card.translation, state: 'error' },
-          hint: card.hint && card.hint.state === 'streaming' ? { ...card.hint, state: 'error' } : card.hint,
-        })),
+        cards: state.cards.map(failUnfinished),
       };
 
     case 'reset':

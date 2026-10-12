@@ -4,6 +4,7 @@ import type { LlmProvider } from './llm/types';
 import { createSentenceAssembler, type AssemblerOutput } from './sentences';
 import type { SttProvider, SttStream } from './stt/types';
 import { streamHint, type HintOptions } from './hint';
+import { HINT_CONTEXT_SENTENCES } from './prompts';
 import { translateSentence, type TranslateOptions } from './translate';
 import { validateStart } from './validateStart';
 
@@ -45,9 +46,6 @@ export interface Session {
 type State = 'waiting' | 'starting' | 'running' | 'ending' | 'done';
 
 const DEFAULT_START_TIMEOUT_MS = 10_000;
-
-// How many earlier sentences a hint is shown as context.
-const HINT_CONTEXT = 6;
 
 // On "stop", translations that are still running get this long to finish.
 const STOP_GRACE_MS = 5000;
@@ -111,7 +109,10 @@ export function createSession(deps: SessionDeps): Session {
     }
     job = job.catch(() => log('session_error translation_crashed'));
     running.add(job);
-    void job.finally(() => running.delete(job));
+    void job.finally(() => {
+      running.delete(job);
+      if (controllers.get(id) === mine) controllers.delete(id);
+    });
   }
 
   // Builds a reply hint for the sentence with this id, on request. One hint per sentence at a time.
@@ -133,7 +134,7 @@ export function createSession(deps: SessionDeps): Session {
         context: {
           callContext,
           profile,
-          previous: history.slice(Math.max(0, id - 1 - HINT_CONTEXT), id - 1),
+          previous: history.slice(Math.max(0, id - 1 - HINT_CONTEXT_SENTENCES), id - 1),
           sentence,
         },
         emit: send,
@@ -145,7 +146,11 @@ export function createSession(deps: SessionDeps): Session {
       job = Promise.reject(error);
     }
     // Not added to `running`: on stop we do not wait for hints.
-    job.catch(() => log('session_error hint_crashed'));
+    void job
+      .catch(() => log('session_error hint_crashed'))
+      .finally(() => {
+        if (hintControllers.get(id) === mine) hintControllers.delete(id); // finished: nothing left to cancel
+      });
   }
 
   // Sends what the sentence assembler produced: finished sentences first, then the live card text.

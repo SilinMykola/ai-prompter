@@ -252,6 +252,45 @@ describe('a new server session', () => {
   });
 });
 
+describe('the end of the call', () => {
+  it('marks translations and hints that are still coming as failed, because nothing more will arrive', () => {
+    const state = run([
+      sentence(1),
+      { type: 'translation_delta', id: 1, delta: 'Полов' },
+      { type: 'hint_start', id: 1, mode: 'short' },
+      sentence(2),
+      sentence(3),
+      { type: 'translation_delta', id: 3, delta: 'Готово' },
+      { type: 'translation_done', id: 3 },
+      { type: 'status', state: 'stopped' },
+    ]);
+
+    expect(card(state, 1).translation).toEqual({ text: 'Полов', state: 'error' });
+    expect(card(state, 1).hint).toEqual({ mode: 'short', text: '', state: 'error' });
+    expect(card(state, 2).translation.state).toBe('error');
+    expect(card(state, 3).translation).toEqual({ text: 'Готово', state: 'done' });
+    expect(state.status).toBe('stopped');
+  });
+
+  it('leaves finished hints alone', () => {
+    const state = run([
+      sentence(1),
+      { type: 'hint_start', id: 1, mode: 'short' },
+      { type: 'hint_delta', id: 1, delta: 'Ja.' },
+      { type: 'hint_done', id: 1 },
+      { type: 'status', state: 'stopped' },
+    ]);
+
+    expect(card(state, 1).hint).toEqual({ mode: 'short', text: 'Ja.', state: 'done' });
+  });
+
+  it('does not touch cards on other status changes', () => {
+    const state = run([sentence(1), { type: 'status', state: 'reconnecting' }]);
+
+    expect(card(state, 1).translation.state).toBe('waiting');
+  });
+});
+
 describe('reset', () => {
   it('returns to the initial state', () => {
     expect(run([sentence(1), { type: 'reset' }])).toEqual(initialCallState);

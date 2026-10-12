@@ -892,6 +892,22 @@ describe('hints in the session', () => {
     await stopping;
   });
 
+  it('forgets the controller of a finished hint, so a long call does not pile them up', async () => {
+    const { session, service, hint } = await running();
+    service.onResult(sentences('Eins.'));
+    let finish!: () => void;
+    hint.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+
+    await askHint(session, 1);
+    const signal = hint.mock.calls[0][0].signal!;
+    finish();
+    await vi.advanceTimersByTimeAsync(0);
+    hint.mockImplementation(() => new Promise(() => {}));
+    await askHint(session, 1, 'detailed'); // a new request after the first finished: must not "cancel" anything finished
+
+    expect(signal.aborted).toBe(false);
+  });
+
   it('cancels hints when the browser disappears', async () => {
     const { session, service, hint } = await running();
     hint.mockImplementation(() => new Promise(() => {}));
