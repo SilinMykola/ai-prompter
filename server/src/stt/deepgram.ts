@@ -17,6 +17,13 @@ const KEEP_ALIVE_AFTER_MS = 4000;
 // After CloseStream we wait this long for the last results before cutting the connection.
 const CLOSE_TIMEOUT_MS = 2000;
 
+// A connection that stayed open this long counts as healthy: the retry schedule starts over.
+// (A quiet call sends no messages, so waiting for a message alone would never reset it.)
+const STABLE_AFTER_MS = 5000;
+
+// Every webm recording starts with these bytes (the EBML header). Seeing them means "a new recording begins here".
+const WEBM_HEADER = [0x1a, 0x45, 0xdf, 0xa3];
+
 // Waits before reconnect attempts 1..5. After the fifth failed attempt we give up.
 const RECONNECT_DELAYS_MS = [500, 1000, 2000, 4000, 8000];
 
@@ -47,6 +54,18 @@ function buildUrl(model: string, language: Language): string {
   return `${LISTEN_URL}?${params}`;
 }
 
+function isWebmHeader(chunk: Uint8Array): boolean {
+  return WEBM_HEADER.every((byte, i) => chunk[i] === byte);
+}
+
+/** A WebSocket message can arrive as text, Buffer, ArrayBuffer or a list of Buffers. */
+function messageToString(data: unknown): string {
+  if (typeof data === 'string') return data;
+  if (Array.isArray(data)) return Buffer.concat(data as Buffer[]).toString();
+  if (data instanceof ArrayBuffer) return Buffer.from(data).toString();
+  return String(data);
+}
+
 export function createDeepgramProvider(options: DeepgramOptions): SttProvider {
   const createSocket = options.createSocket ?? defaultSocketFactory;
   const log = options.log ?? (() => {});
@@ -64,12 +83,17 @@ export function createDeepgramProvider(options: DeepgramOptions): SttProvider {
     let retries = 0; // retries since the last good connection
     let closing = false; // close() was called: no more reconnects, wait for the service to finish
     let finished = false; // over for good (closed or fatal): ignore everything
+    // After a reconnect or an overflow the browser restarts its recorder. Until the first chunk
+    // of the new recording (it carries the webm header) arrives, chunks of the old one are useless.
+    let awaitingHeader = false;
+    let closePromise: Promise<void> | undefined;
     // Audio that arrived before the first connection opened. It is sent first and in order,
     // because the very first chunk holds the webm header the service needs.
     let pending: Uint8Array[] = [];
     let keepAliveTimer: ReturnType<typeof setTimeout> | undefined;
     let closeTimer: ReturnType<typeof setTimeout> | undefined;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let stableTimer: ReturnType<typeof setTimeout> | undefined;
     const closeWaiters: Array<() => void> = [];
 
     function finish(): void {
@@ -77,7 +101,17 @@ export function createDeepgramProvider(options: DeepgramOptions): SttProvider {
       clearTimeout(keepAliveTimer);
       clearTimeout(closeTimer);
       clearTimeout(retryTimer);
+      clearTimeout(stableTimer);
       for (const resolve of closeWaiters.splice(0)) resolve();
+    }
+
+    // A failing send must not crash the process: the 'close' event will follow and drive the reconnect.
+    function safeSend(current: SocketLike, data: Uint8Array | string): void {
+      try {
+        current.send(data);
+      } catch {
+        log('stt_send_failed');
+      }
     }
 
     // (Re)starts the "4 seconds of silence" countdown. Called after every audio send.
@@ -85,13 +119,13 @@ export function createDeepgramProvider(options: DeepgramOptions): SttProvider {
       clearTimeout(keepAliveTimer);
       keepAliveTimer = setTimeout(() => {
         // KeepAlive must be a text message; a binary one may be misread as audio.
-        current.send(JSON.stringify({ type: 'KeepAlive' }));
+        safeSend(current, JSON.stringify({ type: 'KeepAlive' }));
         armKeepAlive(current);
       }, KEEP_ALIVE_AFTER_MS);
     }
 
     function sendAudio(current: SocketLike, chunk: Uint8Array): void {
-      current.send(chunk);
+      safeSend(current, chunk);
       armKeepAlive(current);
     }
 
@@ -166,17 +200,21 @@ export function createDeepgramProvider(options: DeepgramOptions): SttProvider {
         for (const chunk of pending) sendAudio(current, chunk);
         pending = [];
         armKeepAlive(current);
+        stableTimer = setTimeout(() => (retries = 0), STABLE_AFTER_MS);
         handlers.onOpen();
-        if (reconnected) handlers.onRestartRecorder();
+        if (reconnected) {
+          awaitingHeader = true;
+          handlers.onRestartRecorder();
+        }
       });
 
-      current.on('message', (data: Buffer | string) => {
+      current.on('message', (data: unknown) => {
         if (stale()) return;
         if (!gotMessage) {
           gotMessage = true;
           retries = 0; // this connection works: a later loss starts the schedule from the beginning
         }
-        handleMessage(data.toString());
+        handleMessage(messageToString(data));
       });
 
       // Without an 'error' listener Node would crash on a network error. The details
@@ -189,16 +227,21 @@ export function createDeepgramProvider(options: DeepgramOptions): SttProvider {
       current.on('unexpected-response', (_request: unknown, response: { statusCode?: number }) => {
         if (stale()) return;
         log(`stt_rejected status=${response.statusCode}`);
-        if (response.statusCode === 401 || response.statusCode === 403) {
+        const status = response.statusCode ?? 0;
+        if (status === 401 || status === 403) {
           fatal('auth', 'The speech recognition service rejected the API key');
+        } else if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
+          // A bad request (wrong model or language) will not get better by retrying.
+          fatal('connection', `The speech recognition service refused the connection (HTTP ${status})`);
         }
-        current.terminate();
+        current.terminate(); // otherwise the 'close' that follows schedules a retry
       });
 
       current.on('close', (code: number) => {
         if (stale()) return;
         isOpen = false;
         clearTimeout(keepAliveTimer);
+        clearTimeout(stableTimer);
         log(`stt_closed code=${code}`);
         if (closing) {
           finish();
@@ -210,6 +253,10 @@ export function createDeepgramProvider(options: DeepgramOptions): SttProvider {
 
     function send(chunk: Uint8Array): void {
       if (closing || finished) return;
+      if (awaitingHeader) {
+        if (!isWebmHeader(chunk)) return;
+        awaitingHeader = false;
+      }
       if (isOpen) {
         sendAudio(socket!, chunk);
         return;
@@ -219,6 +266,7 @@ export function createDeepgramProvider(options: DeepgramOptions): SttProvider {
         // Too long to connect. Dropping only the oldest chunks would lose the webm header,
         // so drop everything and let the browser start a new recording (with a new header).
         pending = [];
+        awaitingHeader = true;
         handlers.onRestartRecorder();
         return;
       }
@@ -228,20 +276,23 @@ export function createDeepgramProvider(options: DeepgramOptions): SttProvider {
     // Ends the stream politely: CloseStream makes the service finish the words it is still
     // processing, so we wait for its goodbye (or 2 seconds) before hanging up.
     function close(): Promise<void> {
+      if (closePromise) return closePromise; // closing twice is harmless
       if (finished) return Promise.resolve();
       closing = true;
       clearTimeout(keepAliveTimer);
       clearTimeout(retryTimer);
-      const done = new Promise<void>((resolve) => closeWaiters.push(resolve));
+      closePromise = new Promise<void>((resolve) => closeWaiters.push(resolve));
       if (isOpen) {
-        socket!.send(JSON.stringify({ type: 'CloseStream' }));
+        safeSend(socket!, JSON.stringify({ type: 'CloseStream' }));
         closeTimer = setTimeout(() => socket!.terminate(), CLOSE_TIMEOUT_MS);
       } else if (inOutage) {
-        finish(); // between attempts: there is no connection to close
+        // Between attempts, or an attempt is still connecting: make sure nothing stays open.
+        finish();
+        socket?.terminate();
       } else {
         socket!.terminate(); // never opened: nothing to wait for
       }
-      return done;
+      return closePromise;
     }
 
     connect();

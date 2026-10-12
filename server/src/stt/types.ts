@@ -41,9 +41,8 @@ export interface SttProvider {
 // The few WebSocket features we use. The `ws` library's WebSocket fits this,
 // and tests can pass a fake socket.
 export interface SocketLike {
-  readonly readyState: number;
   send(data: Uint8Array | string): void;
-  close(): void;
+  /** Hangs up at once, without a closing handshake. */
   terminate(): void;
   on(event: string, listener: (...args: any[]) => void): unknown;
 }

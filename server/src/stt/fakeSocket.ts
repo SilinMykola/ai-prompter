@@ -6,7 +6,6 @@ import type { SocketFactory, SocketLike } from './types';
 export class FakeSocket extends EventEmitter implements SocketLike {
   readyState = 0; // 0 = connecting, 1 = open, 3 = closed (same numbers as the real WebSocket)
   sent: Array<Uint8Array | string> = [];
-  closeCalls = 0;
   terminateCalls = 0;
 
   constructor(
@@ -18,11 +17,6 @@ export class FakeSocket extends EventEmitter implements SocketLike {
 
   send(data: Uint8Array | string): void {
     this.sent.push(data);
-  }
-
-  /** Our side asks to close; a real service answers with a close event (the test triggers that). */
-  close(): void {
-    this.closeCalls++;
   }
 
   terminate(): void {

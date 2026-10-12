@@ -28,6 +28,8 @@ function setup(language: 'de' | 'en' | 'multi' = 'multi') {
 }
 
 const chunk = (n: number) => new Uint8Array([n, n, n]);
+// The first chunk of every webm recording starts with these 4 bytes (the EBML header).
+const header = (n: number) => new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, n]);
 
 describe('connection', () => {
   it('connects with the documented query parameters', () => {
@@ -112,9 +114,11 @@ describe('audio forwarding', () => {
     sockets[0].open();
     expect(sockets[0].audio).toEqual([]);
 
-    // After the restart the new header and following chunks are held again as usual.
-    stream.send(chunk(100));
-    expect(sockets[0].audio).toEqual([chunk(100)]);
+    // Until the restarted recording begins (a chunk with the webm header), chunks are useless and dropped.
+    stream.send(chunk(99));
+    stream.send(header(100));
+    stream.send(chunk(101));
+    expect(sockets[0].audio).toEqual([header(100), chunk(101)]);
   });
 });
 
@@ -391,9 +395,24 @@ describe('reconnecting', () => {
     stream.send(chunk(1));
     vi.advanceTimersByTime(500);
     sockets[1].open();
-    stream.send(chunk(2));
+    stream.send(header(2));
 
-    expect(sockets[1].audio).toEqual([chunk(2)]);
+    expect(sockets[1].audio).toEqual([header(2)]);
+  });
+
+  it('after a reconnect, drops old-recording chunks until the restarted recording begins', () => {
+    const { stream, sockets } = setup();
+    connectAndReceive(sockets);
+    sockets[0].drop();
+    vi.advanceTimersByTime(500);
+    sockets[1].open();
+
+    stream.send(chunk(7)); // still from the old recording, no header
+    stream.send(chunk(8));
+    stream.send(header(9)); // the restarted recorder
+    stream.send(chunk(10));
+
+    expect(sockets[1].audio).toEqual([header(9), chunk(10)]);
   });
 
   it('ignores late messages from a connection it has already replaced', () => {
@@ -485,5 +504,104 @@ describe('privacy', () => {
     expect(everything).not.toContain('geheimer');
     expect(log).toHaveBeenCalled(); // events are logged, just not their text
     consoleSpies.forEach((spy) => spy.mockRestore());
+  });
+});
+
+describe('review fixes', () => {
+  it('terminates an attempt that is still connecting when closed during an outage', async () => {
+    const { stream, sockets, h } = setup();
+    connectAndReceive(sockets);
+    sockets[0].drop();
+    vi.advanceTimersByTime(500); // attempt 2 starts connecting
+    expect(sockets).toHaveLength(2);
+
+    await stream.close();
+    sockets[1].open(); // the handshake finishes anyway: nobody listens any more
+
+    expect(sockets[1].terminateCalls).toBe(1);
+    expect(h.onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets the retry schedule after a connection stayed open for 5 seconds, even in silence', () => {
+    const { sockets } = setup();
+    sockets[0].open(); // no message ever arrives (silence)
+    vi.advanceTimersByTime(5000);
+    sockets[0].drop();
+    vi.advanceTimersByTime(500);
+    sockets[1].open();
+    vi.advanceTimersByTime(5000);
+    sockets[1].drop();
+
+    vi.advanceTimersByTime(500);
+
+    expect(sockets).toHaveLength(3); // still the first delay (0.5 s) each time
+  });
+
+  it('does not reset the schedule for connections that open and drop at once', () => {
+    const { sockets, h } = setup();
+    sockets[0].open();
+    sockets[0].drop();
+    for (let i = 1; i <= 5; i++) {
+      vi.advanceTimersByTime(8000);
+      sockets[i].open();
+      sockets[i].drop();
+    }
+
+    expect(h.onFatal).toHaveBeenCalledTimes(1);
+  });
+
+  it('close() can be called twice: one CloseStream, one promise', async () => {
+    const { stream, sockets } = setup();
+    sockets[0].open();
+
+    const first = stream.close();
+    const second = stream.close();
+    sockets[0].drop(1000);
+    await Promise.all([first, second]);
+
+    expect(sockets[0].text.filter((t) => t.includes('CloseStream'))).toHaveLength(1);
+  });
+
+  it.each([400, 404])('treats HTTP %i as fatal (a retry cannot help)', (status) => {
+    const { sockets, h } = setup();
+
+    sockets[0].reject(status);
+    vi.advanceTimersByTime(60_000);
+
+    expect(h.onFatal).toHaveBeenCalledWith(expect.objectContaining({ kind: 'connection' }));
+    expect(sockets).toHaveLength(1);
+  });
+
+  it.each([429, 503])('retries after HTTP %i', (status) => {
+    const { sockets, h } = setup();
+
+    sockets[0].reject(status);
+    vi.advanceTimersByTime(500);
+
+    expect(sockets).toHaveLength(2);
+    expect(h.onFatal).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when the socket refuses to send (audio and KeepAlive)', () => {
+    const { stream, sockets } = setup();
+    sockets[0].open();
+    sockets[0].send = () => {
+      throw new Error('not open');
+    };
+
+    expect(() => stream.send(chunk(1))).not.toThrow();
+    expect(() => vi.advanceTimersByTime(5000)).not.toThrow();
+  });
+
+  it('understands messages delivered as ArrayBuffer or as a list of buffers', () => {
+    const { sockets, h } = setup();
+    sockets[0].open();
+    const json = JSON.stringify(resultMessage('Hallo.', true));
+    const bytes = Buffer.from(json);
+
+    sockets[0].emit('message', bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length), false);
+    sockets[0].emit('message', [bytes.subarray(0, 10), bytes.subarray(10)], false);
+
+    expect(h.onResult).toHaveBeenCalledTimes(2);
   });
 });

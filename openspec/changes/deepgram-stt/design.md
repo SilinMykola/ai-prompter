@@ -33,6 +33,10 @@ Facts established while planning (documentation plus a real call with the projec
 - **Reset of the retry counter** after a connection that stayed open and delivered at least one message; five consecutive failures give up. Delays 0.5, 1, 2, 4, 8 s.
 - **Logging:** the provider takes an optional `log(event)` that only receives event names and codes. Transcripts never reach it.
 
+- **Header gating (added after review):** after a reconnect or an overflow, chunks are dropped until one starts with the webm EBML bytes `1A 45 DF A3`, because chunks the browser recorded before the restart would reach the service without a header. The WAV file used for the live check also showed that Deepgram ends a stream after a finite WAV file, which a live webm stream never does.
+- **Retry reset (added after review):** a connection counts as healthy after 5 seconds open or on the first message, because a quiet call sends no messages.
+- **Robustness (added after review):** `send` failures are swallowed (the `close` event drives recovery), messages may arrive as text, `Buffer`, `ArrayBuffer` or a list of buffers, and close is idempotent and terminates an attempt that is still connecting.
+
 ## Risks / Trade-offs
 
 - [webm/opus not auto-detected by the service] → documented as unverified; fall back plan is to send `encoding=opus` in a later change if the end-to-end test fails.

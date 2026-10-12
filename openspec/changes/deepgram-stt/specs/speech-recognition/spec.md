@@ -92,6 +92,46 @@ After an unexpected loss of the connection the system SHALL tell the caller it i
 - **WHEN** five consecutive retries fail
 - **THEN** a fatal error is reported and no further retries happen
 
+### Requirement: Fresh recording after a restart
+After asking the caller to restart the recorder (after a reconnect, or after dropping held audio), the system SHALL discard chunks until one begins with the webm header bytes `1A 45 DF A3`, and then forward audio normally.
+
+#### Scenario: Old chunks still arriving
+- **WHEN** the recorder restart was requested and two chunks from the old recording arrive, followed by a chunk starting with the webm header and a normal chunk
+- **THEN** only the header chunk and the normal chunk after it are sent
+
+### Requirement: Healthy connections reset the retry schedule
+A connection that stayed open for five seconds, or delivered a message, SHALL count as healthy, so that a later loss starts again at the shortest delay; connections that open and drop at once SHALL NOT reset it.
+
+#### Scenario: Quiet but stable call
+- **WHEN** a connection stays open for five seconds without any message and then drops
+- **THEN** the retry happens after 0.5 s
+
+#### Scenario: Flapping connection
+- **WHEN** five consecutive connections open and immediately drop
+- **THEN** a fatal error is reported
+
+### Requirement: Closing is clean and repeatable
+Closing a stream SHALL leave no connection open, including an attempt that was still connecting during an outage, and closing twice SHALL send a single `CloseStream` and give the same result.
+
+#### Scenario: Close during an attempt
+- **WHEN** the stream is closed while a reconnect attempt is still connecting
+- **THEN** that attempt is terminated and its later events are ignored
+
+#### Scenario: Double close
+- **WHEN** close is called twice
+- **THEN** one `CloseStream` is sent and both calls finish together
+
+### Requirement: Requests that cannot succeed are fatal
+An HTTP 4xx answer when connecting, other than 408 and 429, SHALL be reported as a fatal error with kind `connection` and not retried.
+
+#### Scenario: Bad request
+- **WHEN** the service answers the connection request with HTTP 400
+- **THEN** a fatal error is reported and no retry is scheduled
+
+#### Scenario: Busy service
+- **WHEN** the service answers with HTTP 429 or 503
+- **THEN** the system retries after the usual delay
+
 ### Requirement: Rejected key is fatal
 An authentication failure (HTTP 401 or 403 when connecting) SHALL be reported as a fatal error at once, without retries.
 
