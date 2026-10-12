@@ -297,3 +297,68 @@ describe('ending', () => {
     expect(kit.actions).toHaveLength(count);
   });
 });
+
+describe('review fixes', () => {
+  it('releases the capture when opening the connection fails', async () => {
+    const kit = setup({
+      createConnection: vi.fn(() => {
+        throw new Error('bad url');
+      }),
+    });
+
+    await expect(startCall(settings, kit.deps)).rejects.toThrow('bad url');
+
+    expect(kit.capture.stops).toBe(1);
+  });
+
+  it('ends the call with an explanation when the recorder cannot start', async () => {
+    const kit = setup();
+    kit.capture.start.mockImplementation(() => {
+      throw new CaptureError('Этот браузер не умеет записывать звук.');
+    });
+    await startCall(settings, kit.deps);
+
+    kit.server.onSessionReady(false);
+
+    expect(kit.actions).toContainEqual({ type: 'error', message: 'Этот браузер не умеет записывать звук.' });
+    expect(kit.actions.at(-1)).toEqual({ type: 'status', state: 'stopped' });
+    expect(kit.capture.stops).toBe(1);
+    expect(kit.connection.stop).toHaveBeenCalled();
+  });
+
+  it('ends the call with an explanation when a recorder restart fails', async () => {
+    const kit = setup();
+    await startCall(settings, kit.deps);
+    kit.server.onSessionReady(false);
+    kit.capture.restart.mockImplementation(() => {
+      throw new Error('recorder broke');
+    });
+
+    kit.server.onMessage({ type: 'restart_recorder' });
+
+    expect(kit.actions).toContainEqual({ type: 'error', message: expect.stringMatching(/запис/i) });
+    expect(kit.actions.at(-1)).toEqual({ type: 'status', state: 'stopped' });
+  });
+
+  it('still reaches "stopped" when stopping the connection fails', async () => {
+    const kit = setup();
+    const call = await startCall(settings, kit.deps);
+    kit.connection.stop = vi.fn(async () => {
+      throw new Error('socket error');
+    }) as never;
+
+    await expect(call.stop()).resolves.toBeUndefined();
+
+    expect(kit.actions.at(-1)).toEqual({ type: 'status', state: 'stopped' });
+  });
+
+  it('shows no notices after the call ended', async () => {
+    const kit = setup();
+    const call = await startCall(settings, kit.deps);
+    await call.stop();
+
+    kit.server.onCardUnavailable(1);
+
+    expect(kit.notices).toEqual([]);
+  });
+});

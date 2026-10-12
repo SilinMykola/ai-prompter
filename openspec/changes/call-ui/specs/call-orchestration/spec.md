@@ -64,3 +64,21 @@ If audio cannot be obtained when starting, the orchestrator SHALL fail without o
 #### Scenario: Refused sharing
 - **WHEN** the user refuses the share dialog
 - **THEN** no connection is opened and the error is passed on
+
+### Requirement: Failures during a call are visible
+If the recorder cannot start or restart, or closing the connection fails, the call SHALL end with an explanation instead of hanging, and if opening the connection fails after audio was obtained, the audio SHALL be released.
+
+#### Scenario: Recorder cannot start
+- **WHEN** the recorder fails to start after the session was accepted
+- **THEN** the screen shows the reason, the state becomes stopped and capture is released
+
+#### Scenario: Connection cannot be opened
+- **WHEN** opening the connection throws after audio was obtained
+- **THEN** the audio is released and the error is passed on
+
+### Requirement: One start at a time
+While a start is in progress the start button SHALL be disabled, a second start SHALL be ignored, and a call that finishes starting after the page was closed SHALL be stopped at once.
+
+#### Scenario: Double click
+- **WHEN** the start button is pressed twice quickly
+- **THEN** only one call is started

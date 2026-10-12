@@ -16,7 +16,7 @@ const twoProviders: ApiConfig = {
 const oneProvider: ApiConfig = { ...twoProviders, providers: [twoProviders.providers[0]] };
 
 // The screen is "controlled": the parent owns the settings. This little parent does the same job in tests.
-function renderScreen(config: ApiConfig, options: { error?: string | null; initial?: Partial<Settings> } = {}) {
+function renderScreen(config: ApiConfig, options: { error?: string | null; initial?: Partial<Settings>; starting?: boolean } = {}) {
   const onStart = vi.fn();
   const changes: Settings[] = [];
   function Parent() {
@@ -26,6 +26,7 @@ function renderScreen(config: ApiConfig, options: { error?: string | null; initi
         config={config}
         settings={settings}
         error={options.error ?? null}
+        starting={options.starting}
         onChange={(next) => {
           changes.push(next);
           setSettings(next);
@@ -133,5 +134,13 @@ describe('setup screen', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('while a start is in progress', () => {
+  it('disables the start button so it cannot be pressed twice', () => {
+    renderScreen(twoProviders, { starting: true });
+
+    expect(screen.getByRole('button', { name: 'Запускаю…' })).toBeDisabled();
   });
 });

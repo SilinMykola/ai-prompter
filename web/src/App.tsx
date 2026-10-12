@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ApiConfig } from '@ai-prompter/shared/protocol';
 import { CallScreen } from './components/CallScreen';
 import { SetupScreen } from './components/SetupScreen';
@@ -39,6 +39,9 @@ export function App({ fetchConfig = defaultFetchConfig, start, storage = browser
   const [config, setConfig] = useState<ApiConfig | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  // A ref (not state) because two quick clicks can happen before React re-renders.
+  const startingNow = useRef(false);
   const call = useCall(start);
 
   const loadConfig = useCallback(() => {
@@ -57,14 +60,23 @@ export function App({ fetchConfig = defaultFetchConfig, start, storage = browser
   useEffect(loadConfig, [loadConfig]);
 
   function handleStart(chosen: Settings) {
+    if (startingNow.current) return; // a double click must not open two captures
+    startingNow.current = true;
+    setStarting(true);
     setStartError(null);
     saveSettings(chosen, storage);
     // `call.begin` runs synchronously up to the browser's share dialog: it is still "inside the click".
-    call.begin(chosen).then(
-      () => setPhase('call'),
-      (error: unknown) =>
-        setStartError(error instanceof CaptureError ? error.message : 'Не удалось начать звонок. Попробуйте снова.'),
-    );
+    call
+      .begin(chosen)
+      .then(
+        () => setPhase('call'),
+        (error: unknown) =>
+          setStartError(error instanceof CaptureError ? error.message : 'Не удалось начать звонок. Попробуйте снова.'),
+      )
+      .finally(() => {
+        startingNow.current = false;
+        setStarting(false);
+      });
   }
 
   if (phase === 'loading') {
@@ -96,5 +108,5 @@ export function App({ fetchConfig = defaultFetchConfig, start, storage = browser
     );
   }
 
-  return <SetupScreen config={config} settings={settings} onChange={setSettings} onStart={handleStart} error={startError} />;
+  return <SetupScreen config={config} settings={settings} onChange={setSettings} onStart={handleStart} error={startError} starting={starting} />;
 }

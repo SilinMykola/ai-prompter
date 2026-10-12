@@ -13,6 +13,8 @@ interface SetupScreenProps {
   onStart(settings: Settings): void;
   /** Why the last start attempt failed (shown as text, with a retry button). */
   error: string | null;
+  /** A start is in progress (the share dialog is open): the button is disabled meanwhile. */
+  starting?: boolean;
 }
 
 const SOURCES: Array<{ value: AudioSource; label: string }> = [
@@ -26,7 +28,7 @@ const LANGUAGES: Array<{ value: Language; label: string }> = [
   { value: 'multi', label: 'Авто (DE+EN)' },
 ];
 
-export function SetupScreen({ config, settings, onChange, onStart, error }: SetupScreenProps) {
+export function SetupScreen({ config, settings, onChange, onStart, error, starting = false }: SetupScreenProps) {
   const provider = config.providers.find((p) => p.id === settings.provider) ?? config.providers[0];
 
   // A small helper: "change one field, keep the rest".
@@ -140,8 +142,8 @@ export function SetupScreen({ config, settings, onChange, onStart, error }: Setu
         </p>
       )}
 
-      <button type="submit" className="button button--primary">
-        {error ? 'Попробовать снова' : 'Начать'}
+      <button type="submit" className="button button--primary" disabled={starting}>
+        {starting ? 'Запускаю…' : error ? 'Попробовать снова' : 'Начать'}
       </button>
     </form>
   );

@@ -44,13 +44,15 @@ export function CallScreen({ state, settings, notice, onStop, onRestart, onHint,
   // Re-run the scrolling whenever the cards or the live phrase change.
   useAutoScroll(feedRef, state);
 
+  const stopped = state.status === 'stopped';
+
   const latest = latestCard(state);
+  // After the end nobody listens any more: the keys must not send requests into the void.
   useHotkeys({
-    onShort: () => latest && onHint(latest.id, 'short'),
-    onDetailed: () => latest && onHint(latest.id, 'detailed'),
+    onShort: () => latest && !stopped && onHint(latest.id, 'short'),
+    onDetailed: () => latest && !stopped && onHint(latest.id, 'detailed'),
   });
 
-  const stopped = state.status === 'stopped';
   const showInvitation = !stopped && state.cards.length === 0 && !state.finalText && !state.interimText;
 
   return (
@@ -95,6 +97,7 @@ export function CallScreen({ state, settings, notice, onStop, onRestart, onHint,
             key={card.id}
             card={card}
             isLatest={card.id === latest?.id}
+            disabled={stopped}
             onHint={(mode) => onHint(card.id, mode)}
             onRetranslate={() => onRetranslate(card.id)}
           />

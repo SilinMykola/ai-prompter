@@ -35,6 +35,8 @@ export function useCall(start: typeof startCall = startCall): UseCall {
   const [notice, setNotice] = useState<string | null>(null);
   const handle = useRef<CallHandle | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout>>();
+  // Set when the component is gone, so a call that finishes starting later can be stopped at once.
+  const disposed = useRef(false);
 
   const notify = useCallback((text: string) => {
     setNotice(text);
@@ -47,19 +49,23 @@ export function useCall(start: typeof startCall = startCall): UseCall {
   }, []);
 
   // When the component goes away (the tab closes), end the call and clear the timer.
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    disposed.current = false;
+    return () => {
+      disposed.current = true;
       clearTimeout(noticeTimer.current);
       void handle.current?.stop();
-    },
-    [],
-  );
+    };
+  }, []);
 
   const begin = useCallback(
     async (settings: Settings) => {
       // Not `await`ed before: `start` asks the browser for audio as its very first step.
       const call = start(settings, { dispatch, notify, createCapture, createConnection, url: socketUrl() });
-      handle.current = await call;
+      const started = await call;
+      handle.current = started;
+      // The page went away while the share dialog or the connection was still opening.
+      if (disposed.current) await started.stop();
     },
     [start, notify],
   );

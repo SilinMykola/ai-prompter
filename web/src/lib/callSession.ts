@@ -1,6 +1,6 @@
 import type { HintMode } from '@ai-prompter/shared/protocol';
 import type { CallAction } from './callReducer';
-import type { Capture, createCapture } from './audioCapture';
+import { CaptureError, type Capture, type createCapture } from './audioCapture';
 import type { Connection, ConnectionOptions } from './connection';
 import type { Settings } from './settings';
 
@@ -52,62 +52,95 @@ export async function startCall(settings: Settings, deps: CallDeps): Promise<Cal
     if (!closed) dispatch(action);
   };
 
+  // The recorder can fail late (for example a browser without webm/opus): say so and end the call,
+  // instead of sitting on "connecting" forever.
+  function failCall(error: unknown): void {
+    if (ended) return;
+    dispatch({
+      type: 'error',
+      message: error instanceof CaptureError ? error.message : 'Не удалось запустить запись звука.',
+    });
+    endByItself();
+  }
+
   // The end that was not asked for by the user: the server ended it, or we lost it for good.
   function endByItself(): void {
     if (ended) return;
     ended = true;
     capture.stop();
-    void connection.stop();
+    connection.stop().catch(() => {}); // already over: a failure to close changes nothing
     closed = true;
     dispatch({ type: 'status', state: 'stopped' });
   }
 
-  const connection: Connection = deps.createConnection({
-    url: deps.url,
-    start: {
-      language: settings.language,
-      provider: settings.provider,
-      translationModel: settings.translationModel,
-      hintModel: settings.hintModel,
-      callContext: settings.callContext,
-      profile: settings.profile,
-    },
-    onMessage(message) {
-      if (message.type === 'restart_recorder') {
-        capture.restart(); // the speech service needs a fresh recording header
-        return;
-      }
-      show(message);
-    },
-    onSessionReady(isReconnect) {
-      if (ended) return;
-      if (isReconnect) {
-        show({ type: 'session_restarted' });
-        capture.restart();
-      } else {
-        // Only now: audio sent before the server accepted the session would be thrown away.
-        capture.start((chunk) => connection.sendAudio(chunk));
-      }
-    },
-    onReconnecting: () => show({ type: 'status', state: 'reconnecting' }),
-    onGaveUp() {
-      if (ended) return;
-      dispatch({ type: 'error', message: 'Нет связи с сервером. Нажмите «Начать заново».' });
-      endByItself();
-    },
-    onCardUnavailable: () => deps.notify('Эта реплика осталась в прошлом соединении — подсказка недоступна.'),
-    onSessionEnded: endByItself,
-  });
+  let connection!: Connection;
+  try {
+    connection = deps.createConnection({
+      url: deps.url,
+      start: {
+        language: settings.language,
+        provider: settings.provider,
+        translationModel: settings.translationModel,
+        hintModel: settings.hintModel,
+        callContext: settings.callContext,
+        profile: settings.profile,
+      },
+      onMessage(message) {
+        if (message.type === 'restart_recorder') {
+          try {
+            capture.restart(); // the speech service needs a fresh recording header
+          } catch (error) {
+            failCall(error);
+          }
+          return;
+        }
+        show(message);
+      },
+      onSessionReady(isReconnect) {
+        if (ended) return;
+        try {
+          if (isReconnect) {
+            show({ type: 'session_restarted' });
+            capture.restart();
+          } else {
+            // Only now: audio sent before the server accepted the session would be thrown away.
+            capture.start((chunk) => connection.sendAudio(chunk));
+          }
+        } catch (error) {
+          failCall(error);
+        }
+      },
+      onReconnecting: () => show({ type: 'status', state: 'reconnecting' }),
+      onGaveUp() {
+        if (ended) return;
+        dispatch({
+          type: 'error',
+          message: 'Нет связи с сервером. Нажмите «Начать заново».',
+        });
+        endByItself();
+      },
+      onCardUnavailable: () => {
+        if (!ended) deps.notify('Эта реплика осталась в прошлом соединении — подсказка недоступна.');
+      },
+      onSessionEnded: endByItself,
+    });
+  } catch (error) {
+    capture.stop(); // nothing was started, so the sharing indicator must go away too
+    throw error;
+  }
 
   const handle: CallHandle = {
     stop() {
       if (stopPromise) return stopPromise;
       ended = true;
       capture.stop(); // the browser's "sharing" indicator goes away at once
-      stopPromise = connection.stop().then(() => {
-        closed = true;
-        dispatch({ type: 'status', state: 'stopped' });
-      });
+      stopPromise = connection
+        .stop()
+        .catch(() => {}) // even if closing fails, the call is over: the screen must say so
+        .then(() => {
+          closed = true;
+          dispatch({ type: 'status', state: 'stopped' });
+        });
       return stopPromise;
     },
     requestHint: (id, mode) => connection.requestHint(id, mode),

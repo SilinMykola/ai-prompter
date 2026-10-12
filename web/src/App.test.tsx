@@ -195,3 +195,41 @@ describe('during and after a call', () => {
     expect(view.handle.stop).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('review fixes', () => {
+  it('starts only one call when the button is pressed twice quickly', async () => {
+    let finish!: (handle: CallHandle) => void;
+    const view = setup({ start: () => new Promise<CallHandle>((resolve) => (finish = resolve)) });
+    const button = await screen.findByRole('button', { name: 'Начать' });
+
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(view.start).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Запускаю…' })).toBeDisabled();
+    await act(async () => finish(view.handle));
+    expect(await screen.findByRole('button', { name: 'Стоп' })).toBeInTheDocument();
+  });
+
+  it('allows another try after a failed start', async () => {
+    const start = vi.fn().mockRejectedValueOnce(new CaptureError('Звук не захвачен.')).mockResolvedValue(fakeHandle());
+    const view = setup({ start });
+
+    await view.user.click(await screen.findByRole('button', { name: 'Начать' }));
+    await view.user.click(await screen.findByRole('button', { name: 'Попробовать снова' }));
+
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(await screen.findByRole('button', { name: 'Стоп' })).toBeInTheDocument();
+  });
+
+  it('stops a call that finishes starting after the page went away', async () => {
+    let finish!: (handle: CallHandle) => void;
+    const view = setup({ start: () => new Promise<CallHandle>((resolve) => (finish = resolve)) });
+    fireEvent.click(await screen.findByRole('button', { name: 'Начать' }));
+
+    view.unmount();
+    await act(async () => finish(view.handle));
+
+    expect(view.handle.stop).toHaveBeenCalledTimes(1);
+  });
+});

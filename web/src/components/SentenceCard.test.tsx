@@ -12,10 +12,10 @@ const card = (change: Partial<Card> = {}): Card => ({
   ...change,
 });
 
-function setup(cardData: Card, isLatest = false) {
+function setup(cardData: Card, isLatest = false, disabled = false) {
   const onHint = vi.fn();
   const onRetranslate = vi.fn();
-  render(<SentenceCard card={cardData} isLatest={isLatest} onHint={onHint} onRetranslate={onRetranslate} />);
+  render(<SentenceCard card={cardData} isLatest={isLatest} disabled={disabled} onHint={onHint} onRetranslate={onRetranslate} />);
   return { onHint, onRetranslate, user: userEvent.setup() };
 }
 
@@ -111,5 +111,22 @@ describe('SentenceCard', () => {
 
     expect(screen.queryByText('1')).not.toBeInTheDocument();
     expect(screen.queryByText('2')).not.toBeInTheDocument();
+  });
+});
+
+describe('review fixes', () => {
+  it('does not show a loading indicator for a finished translation that is empty', () => {
+    setup(card({ translation: { text: '', state: 'done' } }));
+
+    expect(screen.queryByRole('status', { name: 'Перевод загружается' })).not.toBeInTheDocument();
+  });
+
+  it('disables the hint buttons and hides the retry when the call is over', () => {
+    setup(card({ translation: { text: '', state: 'error' } }), true, true);
+
+    expect(screen.getByRole('button', { name: 'Коротко' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Подробно' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'повторить' })).not.toBeInTheDocument();
+    expect(screen.getByText('перевод не получен')).toBeInTheDocument();
   });
 });

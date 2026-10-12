@@ -171,3 +171,20 @@ describe('requests', () => {
     expect(onHint).not.toHaveBeenCalled();
   });
 });
+
+describe('after the call stopped: no more requests', () => {
+  it('the keys do nothing', () => {
+    const { onHint } = setup({ status: 'stopped', cards: [card(1)] });
+
+    fireEvent.keyDown(document.body, { key: '1' });
+    fireEvent.keyDown(document.body, { key: '2' });
+
+    expect(onHint).not.toHaveBeenCalled();
+  });
+
+  it('the hint buttons are disabled', () => {
+    setup({ status: 'stopped', cards: [card(1)] });
+
+    expect(screen.getByRole('button', { name: 'Коротко' })).toBeDisabled();
+  });
+});

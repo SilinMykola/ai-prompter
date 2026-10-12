@@ -7,6 +7,8 @@ interface SentenceCardProps {
   card: Card;
   /** The newest card: the only one the keys 1 and 2 act on, so only it shows the keys. */
   isLatest: boolean;
+  /** The call is over: nobody can answer requests any more. */
+  disabled?: boolean;
   onHint(mode: HintMode): void;
   onRetranslate(): void;
 }
@@ -16,9 +18,10 @@ const HINT_BUTTONS: Array<{ mode: HintMode; label: string; key: string }> = [
   { mode: 'detailed', label: 'Подробно', key: '2' },
 ];
 
-export function SentenceCard({ card, isLatest, onHint, onRetranslate }: SentenceCardProps) {
+export function SentenceCard({ card, isLatest, disabled = false, onHint, onRetranslate }: SentenceCardProps) {
   const { translation, hint } = card;
-  const waiting = translation.text === '' && translation.state !== 'error';
+  // The indicator belongs to a translation that is still coming. A finished one is never "loading".
+  const waiting = translation.state === 'waiting' || (translation.state === 'streaming' && translation.text === '');
 
   return (
     <article className={isLatest ? 'entry entry--latest' : 'entry'}>
@@ -29,9 +32,11 @@ export function SentenceCard({ card, isLatest, onHint, onRetranslate }: Sentence
       {translation.state === 'error' && (
         <p className="entry__failed">
           перевод не получен{' '}
-          <button type="button" className="link-button" onClick={onRetranslate}>
-            повторить
-          </button>
+          {!disabled && (
+            <button type="button" className="link-button" onClick={onRetranslate}>
+              повторить
+            </button>
+          )}
         </p>
       )}
 
@@ -43,6 +48,7 @@ export function SentenceCard({ card, isLatest, onHint, onRetranslate }: Sentence
             className="button button--hint"
             aria-pressed={hint?.mode === mode}
             aria-keyshortcuts={key}
+            disabled={disabled}
             onClick={() => onHint(mode)}
           >
             {label}

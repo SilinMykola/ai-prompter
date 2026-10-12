@@ -83,6 +83,13 @@ The feed SHALL scroll to the newest content when it changes, SHALL stop doing so
 - **WHEN** the user has scrolled up and a new card arrives
 - **THEN** the position does not change
 
+### Requirement: No requests after the end
+After the call has stopped, the hint buttons SHALL be disabled, the "повторить" button hidden and the hotkeys inactive.
+
+#### Scenario: Stopped call
+- **WHEN** the call has stopped and the user presses `1`
+- **THEN** nothing is requested
+
 ### Requirement: Ending and restarting
 After the call has stopped, the screen SHALL keep the cards visible and offer a "Начать заново" button that returns to the setup form.
 
