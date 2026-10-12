@@ -84,14 +84,18 @@ A fatal recognition error SHALL be reported as an `error` message in Russian, fo
 - **THEN** the client receives an `error` saying so, then `status` `stopped`, and the connection is closed
 
 ### Requirement: Tolerance to bad input
-Messages that are not valid JSON or have an unknown type SHALL NOT crash the session; `hint` SHALL be accepted and ignored until it is implemented, and `retranslate` SHALL restart the translation of a known sentence.
+Messages that are not valid JSON or have an unknown type SHALL NOT crash the session; `hint` SHALL produce a reply hint for a known sentence, and `retranslate` SHALL restart the translation of a known sentence.
 
 #### Scenario: Garbage text
 - **WHEN** a text message that is not JSON arrives in a running session
 - **THEN** the client receives an `error` and the session keeps running
 
 #### Scenario: Hint request
-- **WHEN** a `hint` message arrives
+- **WHEN** a `hint` message arrives for a known sentence
+- **THEN** a hint is produced for it
+
+#### Scenario: Hint for an unknown sentence
+- **WHEN** a `hint` message arrives with an unknown id
 - **THEN** nothing happens and the session keeps running
 
 #### Scenario: Retranslate request
