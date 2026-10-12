@@ -2,9 +2,9 @@
 
 ## 1. Call orchestration
 
-- [ ] 1.1 Write failing tests in `web/src/lib/callSession.test.ts` (fake capture, fake connection factory, recording dispatch) for: start errors passed on without opening a connection; no recording before the session is accepted; recording and chunk forwarding after the first ready signal; restart on `restart_recorder`; on a ready reconnect a `session_restarted` action and a recorder restart; reconnecting status during an outage; stop (capture released, connection stopped, stopped state); sharing ended in the browser; server-ended session; giving up; hint and retranslate pass-through; notices for unavailable cards; stop being safe twice; verify they fail
-- [ ] 1.2 Implement `startCall` in `web/src/lib/callSession.ts`; verify the tests pass
-- [ ] 1.3 Break the "start recording only when ready" rule and the release-on-end rule in turn, verify tests fail, restore
+- [x] 1.1 Write failing tests in `web/src/lib/callSession.test.ts` (fake capture, fake connection factory, recording dispatch) for: start errors passed on without opening a connection; no recording before the session is accepted; recording and chunk forwarding after the first ready signal; restart on `restart_recorder`; on a ready reconnect a `session_restarted` action and a recorder restart; reconnecting status during an outage; stop (capture released, connection stopped, stopped state); sharing ended in the browser; server-ended session; giving up; hint and retranslate pass-through; notices for unavailable cards; stop being safe twice; verify they fail
+- [x] 1.2 Implement `startCall` in `web/src/lib/callSession.ts`; verify the tests pass
+- [x] 1.3 Break the "start recording only when ready" rule and the release-on-end rule in turn, verify tests fail, restore
 
 ## 2. Setup screen
 
