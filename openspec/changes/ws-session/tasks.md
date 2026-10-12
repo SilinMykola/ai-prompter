@@ -8,15 +8,15 @@
 
 ## 2. Status and text relay
 
-- [ ] 2.1 Write failing tests for `status` mapping (open, speech started, utterance end, reconnecting, reopened with `restart_recorder`), `sentence` and `interim` messages from final and interim results, utterance-end flush, increasing ids; verify they fail
-- [ ] 2.2 Implement the relay; verify the tests pass
-- [ ] 2.3 Break the interim message and the utterance-end flush in turn, verify the tests fail, restore
+- [x] 2.1 Write failing tests for `status` mapping (open, speech started, utterance end, reconnecting, reopened with `restart_recorder`), `sentence` and `interim` messages from final and interim results, utterance-end flush, increasing ids; verify they fail
+- [x] 2.2 Implement the relay; verify the tests pass
+- [x] 2.3 Break the interim message and the utterance-end flush in turn, verify the tests fail, restore
 
 ## 3. Ending a session
 
-- [ ] 3.1 Write failing tests for `stop` with a result arriving during close (sentence, then `stopped`, then close), connection closed by the browser, fatal STT errors (`auth` and `connection`) with Russian errors, garbage text, unknown types, ignored `hint`/`retranslate`, and that nothing is sent after the session is done; verify they fail
-- [ ] 3.2 Implement stop, close and failure handling; verify the tests pass
-- [ ] 3.3 Add a test that logs, `console` output and sent errors never contain recognised text, context or profile (run a session with distinctive strings); verify, then break it by logging a sentence and see it fail, restore
+- [x] 3.1 Write failing tests for `stop` with a result arriving during close (sentence, then `stopped`, then close), connection closed by the browser, fatal STT errors (`auth` and `connection`) with Russian errors, garbage text, unknown types, ignored `hint`/`retranslate`, and that nothing is sent after the session is done; verify they fail
+- [x] 3.2 Implement stop, close and failure handling; verify the tests pass
+- [x] 3.3 Add a test that logs, `console` output and sent errors never contain recognised text, context or profile (run a session with distinctive strings); verify, then break it by logging a sentence and see it fail, restore
 
 ## 4. Endpoint and origin check
 

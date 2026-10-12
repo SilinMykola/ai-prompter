@@ -1,5 +1,6 @@
 import type { ClientMessage, ServerMessage } from '@ai-prompter/shared/protocol';
 import type { Registry } from './llm';
+import { createSentenceAssembler, type AssemblerOutput } from './sentences';
 import type { SttProvider, SttStream } from './stt/types';
 import { validateStart } from './validateStart';
 
@@ -42,6 +43,16 @@ export function createSession(deps: SessionDeps): Session {
   const log = deps.log ?? (() => {});
   let state: State = 'waiting';
   let stream: SttStream | undefined;
+  const assembler = createSentenceAssembler();
+
+  // Sends what the sentence assembler produced: finished sentences first, then the live card text.
+  // (This is also where translation will be started for each sentence in a later change.)
+  function relay(output: AssemblerOutput): void {
+    for (const sentence of output.sentences) {
+      send({ type: 'sentence', id: sentence.id, text: sentence.text });
+    }
+    send({ type: 'interim', finalText: output.finalText, interimText: output.interimText });
+  }
 
   function send(message: ServerMessage): void {
     if (state !== 'done') deps.send(message);
@@ -83,15 +94,43 @@ export function createSession(deps: SessionDeps): Session {
     send({ type: 'status', state: 'connecting' });
     log(`session_start provider=${check.start.provider} translation=${check.start.translationModel} hint=${check.start.hintModel}`);
     stream = deps.stt.open({ language: check.start.language }, {
-      onOpen() {},
-      onResult() {},
-      onUtteranceEnd() {},
-      onSpeechStarted() {},
-      onReconnecting() {},
-      onRestartRecorder() {},
-      onFatal() {},
+      onOpen: () => send({ type: 'status', state: 'listening' }),
+      onResult: (result) => relay(assembler.pushResult(result)),
+      onUtteranceEnd() {
+        relay(assembler.pushUtteranceEnd());
+        send({ type: 'status', state: 'listening' });
+      },
+      onSpeechStarted: () => send({ type: 'status', state: 'speaking' }),
+      onReconnecting: () => send({ type: 'status', state: 'reconnecting' }),
+      onRestartRecorder: () => send({ type: 'restart_recorder' }),
+      onFatal(error) {
+        if (state === 'done') return;
+        log(`session_error stt_${error.kind}`);
+        send({
+          type: 'error',
+          message:
+            error.kind === 'auth'
+              ? 'Сервис распознавания речи отклонил ключ API. Проверьте DEEPGRAM_API_KEY.'
+              : 'Не удалось подключиться к сервису распознавания речи.',
+        });
+        send({ type: 'status', state: 'stopped' });
+        void stream?.close();
+        finish();
+      },
     });
     state = 'running';
+  }
+
+  // The user pressed "Стоп". Closing the recognition stream may still deliver the last words,
+  // so we wait for it, flush what is left in the sentence buffer, and only then say goodbye.
+  async function handleStop(): Promise<void> {
+    state = 'ending';
+    log('session_stop');
+    await stream?.close();
+    if ((state as State) === 'done') return; // the browser left in the meantime
+    relay(assembler.pushUtteranceEnd());
+    send({ type: 'status', state: 'stopped' });
+    finish();
   }
 
   async function onText(raw: string): Promise<void> {
@@ -111,8 +150,23 @@ export function createSession(deps: SessionDeps): Session {
       return fail('Первым сообщением сессии должно быть «start».');
     }
 
-    if (type === 'start') {
-      send({ type: 'error', message: 'Сессия уже начата.' });
+    if (state === 'starting') {
+      if (type === 'stop') finish(); // handleStart notices that we are done and opens nothing
+      return;
+    }
+
+    // state === 'running'
+    switch (type) {
+      case 'stop':
+        return handleStop();
+      case 'start':
+        send({ type: 'error', message: 'Сессия уже начата.' });
+        return;
+      case 'hint':
+      case 'retranslate':
+        return; // not implemented yet: accepted and ignored
+      default:
+        send({ type: 'error', message: 'Непонятное сообщение от страницы.' });
     }
   }
 
