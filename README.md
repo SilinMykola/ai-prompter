@@ -34,6 +34,14 @@ Call tab (Chrome) --getDisplayMedia--> web (React) --WebSocket /ws--> server (No
 
 The server listens on `127.0.0.1` only. API keys stay on the server.
 
+## Translation
+
+Every finished sentence is translated into Russian at once, in parallel, by the translation model you chose, and streamed into its card (about one second to the first words with the default fast Gemini model). A failed or timed-out (10 s) translation is retried once; after a provider rate limit the app says so in a short note, waits 2 seconds and retries. A card that still fails shows "перевод не получен" with a "повторить" button.
+
+The prompt gives the model the call context and up to four earlier sentences (as context only); your personal data ("Мои данные") is never part of a translation request. Two messages were added to the protocol for this: `translation_start` (empties a card's translation when an attempt restarts) and `notice` (a short note that disappears by itself).
+
+Known quirk: a small, fast model sometimes adds a bracketed German word that is not in the sentence when the call context makes it likely (for example "Termin" in a doctor's-appointment call).
+
 ## The screens
 
 **Setup.** Choose where the sound comes from (a Chrome tab or the microphone), the language (German, English or automatic German + English), the provider and the two models, and optionally describe the call and your own data. Your choices (but not the call description) are remembered in this browser. Pressing "Начать" opens Chrome's share dialog: pick the call tab and tick "Also share tab audio", otherwise the app tells you what to fix.

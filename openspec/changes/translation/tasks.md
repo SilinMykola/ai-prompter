@@ -27,5 +27,5 @@
 
 ## 5. Live check and wrap-up
 
-- [ ] 5.1 Run a live check with the real server, real Deepgram (the synthesised German speech) and the real Gemini key: see sentences with streamed Russian translations, a measured delay from sentence to first translation text, and no conversation text in the server log
-- [ ] 5.2 Document translation and the two new messages in the README; run `npm test`, `npm run typecheck`, `npm run build` and the code-review skill; fix findings
+- [x] 5.1 Run a live check with the real server, real Deepgram (the synthesised German speech) and the real Gemini key: see sentences with streamed Russian translations, a measured delay from sentence to first translation text, and no conversation text in the server log
+- [x] 5.2 Document translation and the two new messages in the README; run `npm test`, `npm run typecheck`, `npm run build` and the code-review skill; fix findings

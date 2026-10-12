@@ -22,6 +22,10 @@ describe('translation prompt: instructions', () => {
     expect(system).toMatch(/parentheses/i);
   });
 
+  it('adds the original only for terms that really are in the sentence', () => {
+    expect(system).toMatch(/only for terms that actually appear in the sentence/i);
+  });
+
   it('asks to leave programming terms untranslated', () => {
     expect(system).toMatch(/programming terms/i);
     expect(system).toMatch(/cron/);
