@@ -2,9 +2,9 @@
 
 ## 1. Session start and audio
 
-- [ ] 1.1 Write failing tests in `server/src/session.test.ts` (fake `send`/`close`, fake STT provider capturing handlers, fake registry) for: valid `start` giving `status connecting` and a stream opened with the right language; invalid `start` giving a Russian `error` and close; audio before `start`; no `start` within 10 s (fake timers); a second `start`; audio forwarded unchanged; audio during validation dropped; verify they fail
-- [ ] 1.2 Implement `createSession` start handling and audio forwarding in `server/src/session.ts`; verify the tests pass
-- [ ] 1.3 Break the first-message rule and the start timeout in turn, verify the tests fail, restore
+- [x] 1.1 Write failing tests in `server/src/session.test.ts` (fake `send`/`close`, fake STT provider capturing handlers, fake registry) for: valid `start` giving `status connecting` and a stream opened with the right language; invalid `start` giving a Russian `error` and close; audio before `start`; no `start` within 10 s (fake timers); a second `start`; audio forwarded unchanged; audio during validation dropped; verify they fail
+- [x] 1.2 Implement `createSession` start handling and audio forwarding in `server/src/session.ts`; verify the tests pass
+- [x] 1.3 Break the first-message rule and the start timeout in turn, verify the tests fail, restore
 
 ## 2. Status and text relay
 
