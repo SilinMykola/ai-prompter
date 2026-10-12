@@ -20,6 +20,10 @@ interface CallScreenProps {
   onRestart(): void;
   onHint(id: number, mode: HintMode): void;
   onRetranslate(id: number): void;
+  /** Moves this screen into a floating window. Omitted where the browser cannot do it. */
+  onPopOut?(): void;
+  /** The window this screen is shown in, when it is not the main page (hotkeys are heard there). */
+  hotkeyWindow?: Window;
 }
 
 const STATUS_LABELS: Record<CallState['status'], string> = {
@@ -39,7 +43,17 @@ const LANGUAGE_LABELS: Record<Settings['language'], string> = {
 
 const PROVIDER_LABELS: Record<ProviderId, string> = { gemini: 'Gemini', anthropic: 'Claude' };
 
-export function CallScreen({ state, settings, notice, onStop, onRestart, onHint, onRetranslate }: CallScreenProps) {
+export function CallScreen({
+  state,
+  settings,
+  notice,
+  onStop,
+  onRestart,
+  onHint,
+  onRetranslate,
+  onPopOut,
+  hotkeyWindow,
+}: CallScreenProps) {
   const feedRef = useRef<HTMLDivElement>(null);
   // Re-run the scrolling whenever the cards or the live phrase change.
   useAutoScroll(feedRef, state);
@@ -48,10 +62,13 @@ export function CallScreen({ state, settings, notice, onStop, onRestart, onHint,
 
   const latest = latestCard(state);
   // After the end nobody listens any more: the keys must not send requests into the void.
-  useHotkeys({
-    onShort: () => latest && !stopped && onHint(latest.id, 'short'),
-    onDetailed: () => latest && !stopped && onHint(latest.id, 'detailed'),
-  });
+  useHotkeys(
+    {
+      onShort: () => latest && !stopped && onHint(latest.id, 'short'),
+      onDetailed: () => latest && !stopped && onHint(latest.id, 'detailed'),
+    },
+    hotkeyWindow,
+  );
 
   const showInvitation = !stopped && state.cards.length === 0 && !state.finalText && !state.interimText;
 
@@ -63,15 +80,22 @@ export function CallScreen({ state, settings, notice, onStop, onRestart, onHint,
             <span className="call__status-dot" aria-hidden="true" />
             {STATUS_LABELS[state.status]}
           </p>
-          {stopped ? (
-            <button type="button" className="button button--primary" onClick={onRestart}>
-              Начать заново
-            </button>
-          ) : (
-            <button type="button" className="button" onClick={onStop}>
-              Стоп
-            </button>
-          )}
+          <div className="call__actions">
+            {onPopOut && !stopped && (
+              <button type="button" className="button" onClick={onPopOut}>
+                Вынести поверх окон
+              </button>
+            )}
+            {stopped ? (
+              <button type="button" className="button button--primary" onClick={onRestart}>
+                Начать заново
+              </button>
+            ) : (
+              <button type="button" className="button" onClick={onStop}>
+                Стоп
+              </button>
+            )}
+          </div>
         </div>
         <p className="call__summary" data-testid="call-summary">
           <span>{LANGUAGE_LABELS[settings.language]}</span>
@@ -102,7 +126,11 @@ export function CallScreen({ state, settings, notice, onStop, onRestart, onHint,
             onRetranslate={() => onRetranslate(card.id)}
           />
         ))}
-        <LivePhrase finalText={state.finalText} interimText={state.interimText} speaking={state.status === 'speaking'} />
+        <LivePhrase
+          finalText={state.finalText}
+          interimText={state.interimText}
+          speaking={state.status === 'speaking'}
+        />
       </div>
     </div>
   );

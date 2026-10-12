@@ -100,3 +100,55 @@ describe('useHotkeys', () => {
     expect(onShort).not.toHaveBeenCalled();
   });
 });
+
+describe('useHotkeys in another window', () => {
+  // The floating window is another window with its own document (here: an iframe's).
+  function otherWindow() {
+    const iframe = document.createElement('iframe');
+    document.body.append(iframe);
+    return iframe.contentWindow!;
+  }
+
+  function HarnessFor({ target, onShort, onDetailed }: { target: Window; onShort(): void; onDetailed(): void }) {
+    useHotkeys({ onShort, onDetailed }, target);
+    return null;
+  }
+
+  it('listens in that window only', () => {
+    const win = otherWindow();
+    const onShort = vi.fn();
+    render(<HarnessFor target={win} onShort={onShort} onDetailed={() => {}} />);
+
+    fireEvent.keyDown(document.body, { key: '1' }); // main window: not listened to
+    expect(onShort).not.toHaveBeenCalled();
+    fireEvent.keyDown(win.document.body, { key: '1' }); // the other window
+
+    expect(onShort).toHaveBeenCalledTimes(1);
+  });
+
+  it('still ignores keys typed into a field of that window', () => {
+    const win = otherWindow();
+    const onShort = vi.fn();
+    render(<HarnessFor target={win} onShort={onShort} onDetailed={() => {}} />);
+    const field = win.document.createElement('textarea'); // an element of the *other* window's classes
+    win.document.body.append(field);
+
+    fireEvent.keyDown(field, { key: '1' });
+
+    expect(onShort).not.toHaveBeenCalled();
+  });
+
+  it('moves its listener when the target window changes', () => {
+    const first = otherWindow();
+    const second = otherWindow();
+    const onShort = vi.fn();
+    const view = render(<HarnessFor target={first} onShort={onShort} onDetailed={() => {}} />);
+
+    view.rerender(<HarnessFor target={second} onShort={onShort} onDetailed={() => {}} />);
+    fireEvent.keyDown(first.document.body, { key: '1' });
+    expect(onShort).not.toHaveBeenCalled();
+    fireEvent.keyDown(second.document.body, { key: '1' });
+
+    expect(onShort).toHaveBeenCalledTimes(1);
+  });
+});

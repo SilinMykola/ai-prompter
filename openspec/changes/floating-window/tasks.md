@@ -8,9 +8,9 @@
 
 ## 2. Hotkeys and the call screen
 
-- [ ] 2.1 Write failing tests that `useHotkeys` listens on a given window when one is passed (keys pressed in that window act, keys in the main window do not) and still guards against typing there; verify they fail
-- [ ] 2.2 Add the optional window parameter to `useHotkeys` and the optional `hotkeyWindow` and `onPopOut` props to `CallScreen`; write failing tests that the button "Вынести поверх окон" appears only with `onPopOut` and not after stopping, and calls it; implement; verify all pass
-- [ ] 2.3 Break the stopped-call rule for the button and the window parameter in turn, verify tests fail, restore
+- [x] 2.1 Write failing tests that `useHotkeys` listens on a given window when one is passed (keys pressed in that window act, keys in the main window do not) and still guards against typing there; verify they fail
+- [x] 2.2 Add the optional window parameter to `useHotkeys` and the optional `hotkeyWindow` and `onPopOut` props to `CallScreen`; write failing tests that the button "Вынести поверх окон" appears only with `onPopOut` and not after stopping, and calls it; implement; verify all pass
+- [x] 2.3 Break the stopped-call rule for the button and the window parameter in turn, verify tests fail, restore
 
 ## 3. App integration
 

@@ -1,3 +1,4 @@
+import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -12,7 +13,7 @@ const card = (id: number, change: Partial<Card> = {}): Card => ({
   ...change,
 });
 
-function setup(state: Partial<CallState> = {}, notice: string | null = null) {
+function setup(state: Partial<CallState> = {}, notice: string | null = null, extra: Partial<React.ComponentProps<typeof CallScreen>> = {}) {
   const handlers = { onStop: vi.fn(), onRestart: vi.fn(), onHint: vi.fn(), onRetranslate: vi.fn() };
   render(
     <CallScreen
@@ -20,6 +21,7 @@ function setup(state: Partial<CallState> = {}, notice: string | null = null) {
       settings={{ language: 'de', provider: 'gemini', translationModel: 'gemini-3.5-flash-lite' }}
       notice={notice}
       {...handlers}
+      {...extra}
     />,
   );
   return { ...handlers, user: userEvent.setup() };
@@ -186,5 +188,43 @@ describe('after the call stopped: no more requests', () => {
     setup({ status: 'stopped', cards: [card(1)] });
 
     expect(screen.getByRole('button', { name: 'Коротко' })).toBeDisabled();
+  });
+});
+
+describe('the floating window button', () => {
+  it('is shown when the app can open one, and asks for it when pressed', async () => {
+    const onPopOut = vi.fn();
+    const { user } = setup({}, null, { onPopOut });
+
+    await user.click(screen.getByRole('button', { name: 'Вынести поверх окон' }));
+
+    expect(onPopOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not shown when the app cannot open one', () => {
+    setup();
+
+    expect(screen.queryByRole('button', { name: 'Вынести поверх окон' })).not.toBeInTheDocument();
+  });
+
+  it('is not shown after the call stopped', () => {
+    setup({ status: 'stopped' }, null, { onPopOut: vi.fn() });
+
+    expect(screen.queryByRole('button', { name: 'Вынести поверх окон' })).not.toBeInTheDocument();
+  });
+});
+
+describe('hotkeys of a call screen shown in another window', () => {
+  it('listens in the given window', () => {
+    const iframe = document.createElement('iframe');
+    document.body.append(iframe);
+    const win = iframe.contentWindow!;
+    const { onHint } = setup({ cards: [card(4)] }, null, { hotkeyWindow: win });
+
+    fireEvent.keyDown(document.body, { key: '1' });
+    expect(onHint).not.toHaveBeenCalled();
+    fireEvent.keyDown(win.document.body, { key: '2' });
+
+    expect(onHint).toHaveBeenCalledWith(4, 'detailed');
   });
 });
