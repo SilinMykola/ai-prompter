@@ -2,9 +2,9 @@
 
 ## 1. The floating-window hook
 
-- [ ] 1.1 Write failing tests in `web/src/hooks/usePipWindow.test.tsx` (a fake `documentPictureInPicture` returning an iframe's window) for `supported` true and false, `open()` calling `requestWindow` with a width of 420 at once, a container created inside the new window, the page's `<style>` rules copied (and a `<link>` for an unreadable sheet), `pagehide` resetting the state, `close()` closing the window and resetting, a rejected request being reported through `failed` without throwing, and opening twice reusing the open window; verify they fail
-- [ ] 1.2 Implement `usePipWindow` in `web/src/hooks/usePipWindow.ts`; verify the tests pass
-- [ ] 1.3 Break the style copying and the `pagehide` handling in turn, verify tests fail, restore
+- [x] 1.1 Write failing tests in `web/src/hooks/usePipWindow.test.tsx` (a fake `documentPictureInPicture` returning an iframe's window) for `supported` true and false, `open()` calling `requestWindow` with a width of 420 at once, a container created inside the new window, the page's `<style>` rules copied (and a `<link>` for an unreadable sheet), `pagehide` resetting the state, `close()` closing the window and resetting, a rejected request being reported through `failed` without throwing, and opening twice reusing the open window; verify they fail
+- [x] 1.2 Implement `usePipWindow` in `web/src/hooks/usePipWindow.ts`; verify the tests pass
+- [x] 1.3 Break the style copying and the `pagehide` handling in turn, verify tests fail, restore
 
 ## 2. Hotkeys and the call screen
 
