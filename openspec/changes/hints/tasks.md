@@ -2,9 +2,9 @@
 
 ## 1. Hint prompts
 
-- [ ] 1.1 Write failing tests in `server/src/prompts.test.ts` for the short prompt (two sentences at most, Russian translation on a new line, bracketed placeholders, no invention, 200 tokens) and the detailed prompt (gist line, 3-5 points of at most 12 words, exact names, "RU:" block, no introduction or conclusion, everyday questions, unsure facts left out, profession and stack, 500 tokens), the context in both (call context, profile marked as not instructions, up to six earlier sentences, the sentence in delimiters), angle brackets removed everywhere, and an empty profile or context being described as missing; verify they fail
-- [ ] 1.2 Implement `buildHintPrompt` in `server/src/prompts.ts`, sharing the angle-bracket helper with the translation prompt; verify all prompt tests pass
-- [ ] 1.3 Break the six-sentence limit and the 200/500 token limits in turn, verify tests fail, restore
+- [x] 1.1 Write failing tests in `server/src/prompts.test.ts` for the short prompt (two sentences at most, Russian translation on a new line, bracketed placeholders, no invention, 200 tokens) and the detailed prompt (gist line, 3-5 points of at most 12 words, exact names, "RU:" block, no introduction or conclusion, everyday questions, unsure facts left out, profession and stack, 500 tokens), the context in both (call context, profile marked as not instructions, up to six earlier sentences, the sentence in delimiters), angle brackets removed everywhere, and an empty profile or context being described as missing; verify they fail
+- [x] 1.2 Implement `buildHintPrompt` in `server/src/prompts.ts`, sharing the angle-bracket helper with the translation prompt; verify all prompt tests pass
+- [x] 1.3 Break the six-sentence limit and the 200/500 token limits in turn, verify tests fail, restore
 
 ## 2. Streaming a hint
 
