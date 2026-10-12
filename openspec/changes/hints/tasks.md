@@ -14,9 +14,9 @@
 
 ## 3. Session integration
 
-- [ ] 3.1 Write failing tests in `server/src/session.test.ts` for a `hint` request reaching the hint function with the sentence, the six earlier sentences, the call context, the profile, the hint model and the mode; unknown ids and modes ignored; a new request for the same sentence cancelling the old one but not other sentences' hints or translations; one rejected-key message for translation and hints together; `stop` not waiting for hints and cancelling them; disconnect cancelling them; a crashing or synchronously throwing hint function being survived; and the profile reaching hints but never translation; verify they fail
-- [ ] 3.2 Implement `hint` handling in `server/src/session.ts`; verify the tests pass and earlier tests still pass
-- [ ] 3.3 Break the per-sentence cancellation and the profile exclusion from translation in turn, verify tests fail, restore
+- [x] 3.1 Write failing tests in `server/src/session.test.ts` for a `hint` request reaching the hint function with the sentence, the six earlier sentences, the call context, the profile, the hint model and the mode; unknown ids and modes ignored; a new request for the same sentence cancelling the old one but not other sentences' hints or translations; one rejected-key message for translation and hints together; `stop` not waiting for hints and cancelling them; disconnect cancelling them; a crashing or synchronously throwing hint function being survived; and the profile reaching hints but never translation; verify they fail
+- [x] 3.2 Implement `hint` handling in `server/src/session.ts`; verify the tests pass and earlier tests still pass
+- [x] 3.3 Break the per-sentence cancellation and the profile exclusion from translation in turn, verify tests fail, restore
 
 ## 4. Live check and wrap-up
 

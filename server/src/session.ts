@@ -1,8 +1,9 @@
-import type { ClientMessage, ServerMessage } from '@ai-prompter/shared/protocol';
+import type { ClientMessage, HintMode, ServerMessage } from '@ai-prompter/shared/protocol';
 import type { Registry } from './llm';
 import type { LlmProvider } from './llm/types';
 import { createSentenceAssembler, type AssemblerOutput } from './sentences';
 import type { SttProvider, SttStream } from './stt/types';
+import { streamHint, type HintOptions } from './hint';
 import { translateSentence, type TranslateOptions } from './translate';
 import { validateStart } from './validateStart';
 
@@ -26,6 +27,8 @@ export interface SessionDeps {
   startTimeoutMs?: number;
   /** Translates one sentence. Replaceable in tests. */
   translate?: (options: TranslateOptions) => Promise<void>;
+  /** Produces one reply hint. Replaceable in tests. */
+  hint?: (options: HintOptions) => Promise<void>;
 }
 
 export interface Session {
@@ -43,6 +46,9 @@ type State = 'waiting' | 'starting' | 'running' | 'ending' | 'done';
 
 const DEFAULT_START_TIMEOUT_MS = 10_000;
 
+// How many earlier sentences a hint is shown as context.
+const HINT_CONTEXT = 6;
+
 // On "stop", translations that are still running get this long to finish.
 const STOP_GRACE_MS = 5000;
 
@@ -52,17 +58,29 @@ export function createSession(deps: SessionDeps): Session {
   let stream: SttStream | undefined;
   const assembler = createSentenceAssembler();
   const translate = deps.translate ?? translateSentence;
+  const hint = deps.hint ?? streamHint;
 
   // What translation needs, known after a valid `start`.
   let llm: LlmProvider | undefined;
   let translationModel = '';
   let callContext = '';
+  let profile = ''; // the user's own data: used for hints only, never for translation
+  let hintModel = '';
   // The sentences said so far (index = id - 1): context for the next translations, and for "retranslate".
   const history: string[] = [];
   const running = new Set<Promise<void>>(); // translations in progress
   const controllers = new Map<number, AbortController>(); // the newest translation of each sentence
   const cancelTranslations = new AbortController(); // aborted when the session ends
+  const cancelHints = new AbortController(); // aborted when the session ends or on stop (nobody reads a hint then)
+  const hintControllers = new Map<number, AbortController>(); // the newest hint of each sentence
   let keyErrorReported = false;
+
+  // One message about a rejected key is enough, however many requests fail because of it.
+  function reportKeyRejected(): void {
+    if (keyErrorReported) return;
+    keyErrorReported = true;
+    send({ type: 'error', message: 'Провайдер языковой модели отклонил ключ API. Проверьте ключ в файле .env.' });
+  }
 
   // Starts translating the sentence with this id. Several run at once, nobody waits for another.
   function startTranslation(id: number, restart = false): void {
@@ -85,11 +103,7 @@ export function createSession(deps: SessionDeps): Session {
         emit: send,
         signal: AbortSignal.any([cancelTranslations.signal, mine.signal]),
         restart,
-        onAuthError() {
-          if (keyErrorReported) return; // one message is enough, even if many sentences fail
-          keyErrorReported = true;
-          send({ type: 'error', message: 'Провайдер языковой модели отклонил ключ API. Проверьте ключ в файле .env.' });
-        },
+        onAuthError: reportKeyRejected,
         log,
       });
     } catch (error) {
@@ -98,6 +112,40 @@ export function createSession(deps: SessionDeps): Session {
     job = job.catch(() => log('session_error translation_crashed'));
     running.add(job);
     void job.finally(() => running.delete(job));
+  }
+
+  // Builds a reply hint for the sentence with this id, on request. One hint per sentence at a time.
+  function startHint(id: number, mode: HintMode): void {
+    const sentence = history[id - 1];
+    if (!llm || sentence === undefined) return;
+
+    hintControllers.get(id)?.abort();
+    const mine = new AbortController();
+    hintControllers.set(id, mine);
+
+    let job: Promise<void>;
+    try {
+      job = hint({
+        provider: llm,
+        model: hintModel,
+        id,
+        mode,
+        context: {
+          callContext,
+          profile,
+          previous: history.slice(Math.max(0, id - 1 - HINT_CONTEXT), id - 1),
+          sentence,
+        },
+        emit: send,
+        signal: AbortSignal.any([cancelHints.signal, mine.signal]),
+        onAuthError: reportKeyRejected,
+        log,
+      });
+    } catch (error) {
+      job = Promise.reject(error);
+    }
+    // Not added to `running`: on stop we do not wait for hints.
+    job.catch(() => log('session_error hint_crashed'));
   }
 
   // Sends what the sentence assembler produced: finished sentences first, then the live card text.
@@ -132,6 +180,7 @@ export function createSession(deps: SessionDeps): Session {
     state = 'done';
     clearTimeout(startTimer);
     cancelTranslations.abort(); // nobody is listening any more
+    cancelHints.abort();
     deps.close();
   }
 
@@ -168,6 +217,8 @@ export function createSession(deps: SessionDeps): Session {
       llm = deps.registry.get(check.start.provider);
       translationModel = check.start.translationModel;
       callContext = check.start.callContext;
+      profile = check.start.profile;
+      hintModel = check.start.hintModel;
       state = 'running'; // before opening: the stream may report a failure at once
       stream = deps.stt.open(
         { language: check.start.language },
@@ -214,6 +265,7 @@ export function createSession(deps: SessionDeps): Session {
     log('session_stop');
     await closeStream();
     if ((state as State) === 'done') return; // the browser left in the meantime
+    cancelHints.abort(); // a hint that is still being written is of no use any more
     relay(assembler.pushUtteranceEnd());
     // Let translations that are still running finish (but not for long): the last sentences are the freshest.
     let grace: ReturnType<typeof setTimeout> | undefined;
@@ -267,8 +319,13 @@ export function createSession(deps: SessionDeps): Session {
         if (typeof id === 'number' && Number.isInteger(id)) startTranslation(id, true); // unknown ids are ignored there
         return;
       }
-      case 'hint':
-        return; // not implemented yet: accepted and ignored
+      case 'hint': {
+        const { id, mode } = message as { id?: unknown; mode?: unknown };
+        // Anything unexpected (unknown sentence, odd mode) is ignored: the browser only sends valid requests.
+        if (typeof id === 'number' && Number.isInteger(id) && (mode === 'short' || mode === 'detailed'))
+          startHint(id, mode);
+        return;
+      }
       default:
         send({ type: 'error', message: 'Непонятное сообщение от страницы.' });
     }
@@ -288,6 +345,7 @@ export function createSession(deps: SessionDeps): Session {
     state = 'done';
     clearTimeout(startTimer);
     cancelTranslations.abort();
+    cancelHints.abort();
     void closeStream();
   }
 

@@ -11,6 +11,7 @@ function setup(overrides: Partial<Parameters<typeof createSession>[0]> = {}) {
   const log = vi.fn();
   // The older tests are about recognition, so translation is replaced by a function that does nothing.
   const translate = vi.fn<NonNullable<SessionDeps['translate']>>(async () => {});
+  const hint = vi.fn<NonNullable<SessionDeps['hint']>>(async () => {});
   const session = createSession({
     send: connection.send,
     close: connection.close,
@@ -18,9 +19,10 @@ function setup(overrides: Partial<Parameters<typeof createSession>[0]> = {}) {
     registry: fakeRegistry,
     log,
     translate,
+    hint,
     ...overrides,
   });
-  return { session, connection, stt, log, translate };
+  return { session, connection, stt, log, translate, hint };
 }
 
 const start = (session: ReturnType<typeof setup>['session'], message: object = validStart) =>
@@ -383,7 +385,7 @@ describe('bad input in a running session', () => {
   it.each([
     { type: 'hint', id: 1, mode: 'short' },
     { type: 'retranslate', id: 1 },
-  ])('accepts and ignores %j until it is implemented', async (message) => {
+  ])('accepts %j for a sentence that does not exist, silently', async (message) => {
     const { session, connection } = await running();
 
     await session.onText(JSON.stringify(message));
@@ -747,5 +749,199 @@ describe('translation in the session', () => {
     ]);
     expect(modelRequests[0]).toContain('<sentence>Guten Tag.</sentence>');
     expect(modelRequests[0]).not.toContain('PROFILE-TEXT');
+  });
+});
+
+describe('hints in the session', () => {
+  const sentences = (text: string) => final(text);
+  const askHint = (session: ReturnType<typeof setup>['session'], id: number | unknown, mode: unknown = 'short') =>
+    session.onText(JSON.stringify({ type: 'hint', id, mode }));
+
+  it('builds a hint for a known sentence with the hint model, the call context, the profile and the earlier sentences', async () => {
+    const { session, service, hint } = await running();
+    service.onResult(sentences('Eins. Zwei.'));
+
+    await askHint(session, 2, 'detailed');
+
+    expect(hint).toHaveBeenCalledTimes(1);
+    expect(hint.mock.calls[0][0]).toMatchObject({
+      model: 'strong',
+      id: 2,
+      mode: 'detailed',
+      provider: fakeRegistry.get('gemini'),
+      context: { callContext: 'CONTEXT-TEXT', profile: 'PROFILE-TEXT', previous: ['Eins.'], sentence: 'Zwei.' },
+    });
+  });
+
+  it('gives a hint the six sentences before the one it answers', async () => {
+    const { session, service, hint } = await running();
+    service.onResult(sentences('S1. S2. S3. S4. S5. S6. S7. S8.'));
+
+    await askHint(session, 8);
+
+    expect(hint.mock.calls[0][0].context.previous).toEqual(['S2.', 'S3.', 'S4.', 'S5.', 'S6.', 'S7.']);
+  });
+
+  it('ignores a hint request without a mode', async () => {
+    const { session, service, hint } = await running();
+    service.onResult(sentences('Eins.'));
+
+    await session.onText(JSON.stringify({ type: 'hint', id: 1 }));
+
+    expect(hint).not.toHaveBeenCalled();
+  });
+
+  it('produces nothing unless a hint is requested', async () => {
+    const { service, hint } = await running();
+
+    service.onResult(sentences('Eins. Zwei.'));
+
+    expect(hint).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 3, -1, 1.5, 'x', null])('ignores a hint for the unknown id %j', async (id) => {
+    const { session, service, hint } = await running();
+    service.onResult(sentences('Eins. Zwei.'));
+
+    await askHint(session, id);
+
+    expect(hint).not.toHaveBeenCalled();
+  });
+
+  it.each(['long', 5, null])('ignores the unknown mode %j', async (mode) => {
+    const { session, service, hint } = await running();
+    service.onResult(sentences('Eins.'));
+
+    await askHint(session, 1, mode);
+
+    expect(hint).not.toHaveBeenCalled();
+  });
+
+  it('lets the hint function send its messages to the browser', async () => {
+    const { session, service, hint, connection } = await running();
+    service.onResult(sentences('Eins.'));
+    hint.mockImplementation(async (options) => {
+      options.emit({ type: 'hint_start', id: options.id, mode: options.mode });
+      options.emit({ type: 'hint_done', id: options.id });
+    });
+
+    await askHint(session, 1);
+    await Promise.resolve();
+
+    expect(connection.messages).toContainEqual({ type: 'hint_start', id: 1, mode: 'short' });
+    expect(connection.messages).toContainEqual({ type: 'hint_done', id: 1 });
+  });
+
+  it('cancels the earlier hint of the same sentence, but not other hints or translations', async () => {
+    const { session, service, hint, translate } = await running();
+    translate.mockImplementation(() => new Promise(() => {}));
+    hint.mockImplementation(() => new Promise(() => {}));
+    service.onResult(sentences('Eins. Zwei.'));
+
+    await askHint(session, 1, 'short');
+    await askHint(session, 2, 'short');
+    const [firstOfOne, firstOfTwo] = hint.mock.calls.map(([options]) => options.signal!);
+    await askHint(session, 1, 'detailed');
+    const secondOfOne = hint.mock.calls[2][0].signal!;
+
+    expect(firstOfOne.aborted).toBe(true);
+    expect(secondOfOne.aborted).toBe(false);
+    expect(firstOfTwo.aborted).toBe(false);
+    expect(translate.mock.calls.every(([options]) => !options.signal!.aborted)).toBe(true);
+  });
+
+  it('reports a rejected key once for translation and hints together', async () => {
+    const { session, service, hint, translate, connection } = await running();
+    translate.mockImplementation(async (options) => options.onAuthError?.());
+    hint.mockImplementation(async (options) => options.onAuthError?.());
+    service.onResult(sentences('Eins.'));
+
+    await askHint(session, 1);
+    await askHint(session, 1);
+
+    expect(connection.messages.filter((m) => m.type === 'error')).toHaveLength(1);
+  });
+
+  it('does not wait for hints on stop, and cancels them', async () => {
+    const { session, service, hint, connection } = await running();
+    hint.mockImplementation(() => new Promise(() => {}));
+    service.onResult(sentences('Eins.'));
+    await askHint(session, 1);
+    const signal = hint.mock.calls[0][0].signal!;
+
+    await session.onText(JSON.stringify({ type: 'stop' })); // would hang here if it waited for the hint
+
+    expect(signal.aborted).toBe(true);
+    expect(connection.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels hints when the browser disappears', async () => {
+    const { session, service, hint } = await running();
+    hint.mockImplementation(() => new Promise(() => {}));
+    service.onResult(sentences('Eins.'));
+    await askHint(session, 1);
+    const signal = hint.mock.calls[0][0].signal!;
+
+    session.onClose();
+
+    expect(signal.aborted).toBe(true);
+  });
+
+  it('survives a hint function that crashes or throws at once', async () => {
+    const { session, service, hint, connection } = await running();
+    service.onResult(sentences('Eins.'));
+
+    hint.mockImplementation(async () => {
+      throw new Error('boom');
+    });
+    await askHint(session, 1);
+    hint.mockImplementation(() => {
+      throw new Error('sync boom');
+    });
+    await expect(askHint(session, 1)).resolves.toBeUndefined();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(connection.close).not.toHaveBeenCalled();
+  });
+
+  it('ignores hint requests after the session ended', async () => {
+    const { session, service, hint } = await running();
+    service.onResult(sentences('Eins.'));
+    await session.onText(JSON.stringify({ type: 'stop' }));
+    hint.mockClear();
+
+    await askHint(session, 1);
+
+    expect(hint).not.toHaveBeenCalled();
+  });
+
+  it('works end to end with the real hint function and a fake model: the profile reaches the hint model only', async () => {
+    const calls: Array<{ system: string; user: string; model: string }> = [];
+    const llm = {
+      id: 'gemini',
+      label: 'Gemini',
+      listModels: async () => ['fast', 'strong'],
+      stream: (request: { system: string; user: string; model: string }) => {
+        calls.push(request);
+        return (async function* () {
+          yield 'Ja, gern.';
+        })();
+      },
+    };
+    const kit = setup({ translate: undefined, hint: undefined, registry: { get: () => llm as never, modelsOf: async () => ['fast', 'strong'] } });
+    await start(kit.session);
+    kit.stt.opened[0].handlers.onResult(sentences('Haben Sie Zeit?'));
+    await vi.advanceTimersByTimeAsync(0);
+    kit.connection.messages.length = 0;
+
+    await askHint(kit.session, 1, 'short');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(kit.connection.messages.map((m) => m.type)).toEqual(['hint_start', 'hint_delta', 'hint_done']);
+    const translation = calls.find((c) => c.model === 'fast')!;
+    const hintCall = calls.find((c) => c.model === 'strong')!;
+    expect(hintCall.system).toContain('PROFILE-TEXT');
+    expect(translation.system).not.toContain('PROFILE-TEXT');
+    expect(translation.user).not.toContain('PROFILE-TEXT');
   });
 });
