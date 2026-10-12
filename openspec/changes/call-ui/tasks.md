@@ -26,7 +26,7 @@
 
 - [x] 4.1 Write failing tests for `App` (loading note, load failure with retry, form after loading with remembered settings, start passing the click to capture, call screen after success, setup error on capture failure, restart returning to the form), using a fake `fetch` and fake call starter; verify they fail
 - [x] 4.2 Implement `useCall` and `App`; verify the tests pass
-- [ ] 4.3 Write `styles.css` for the design described in design.md (dark, 420 px safe, reduced motion); verify the build and typecheck pass
+- [x] 4.3 Write `styles.css` for the design described in design.md (dark, 420 px safe, reduced motion); verify the build and typecheck pass
 - [ ] 4.4 Render the screens at 420 px in a real browser if one is available, check there is no horizontal scroll and the hierarchy reads well, and fix what looks wrong
 
 ## 5. Wrap-up

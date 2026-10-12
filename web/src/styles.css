@@ -1,15 +1,436 @@
-/* Dark theme by default, system fonts only (no external requests). */
+/*
+  AI Prompter: a reading surface for the side of a video call.
+
+  Idea: the original sentence is set like a line from a script (book serif, warm white),
+  everything the app says about it (translation, hints, controls) is plain sans. One accent
+  colour, amber, is used only for things you act on or that answer you: buttons, hints, keys.
+  System fonts only: no external requests.
+*/
+
 :root {
   color-scheme: dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: #111418;
-  color: #e6e9ee;
+
+  --ink: #0e131c; /* page */
+  --ink-raised: #151c28; /* header, form controls */
+  --line: #253145;
+  --paper: #f1eee6; /* the other person's words */
+  --muted: #8c97a8; /* secondary text, guessed words */
+  --teal: #7fc8bd; /* translation */
+  --amber: #e3a93b; /* actions, hints, keys */
+  --red: #ff7b6b;
+
+  --serif: ui-serif, 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
 }
 
 body {
   margin: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.45;
+  overflow-wrap: anywhere; /* a long word must never push the layout wider than the window */
 }
 
-main {
-  padding: 16px;
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* ---------- shared bits ---------- */
+
+.message {
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 48px 16px;
+  color: var(--muted);
+}
+
+.button {
+  font: inherit;
+  font-size: 15px;
+  color: var(--paper);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: var(--muted);
+}
+
+.button--primary {
+  color: var(--ink);
+  background: var(--amber);
+  border-color: var(--amber);
+  font-weight: 600;
+}
+
+.button--primary:hover {
+  border-color: var(--paper);
+}
+
+.link-button {
+  font: inherit;
+  color: var(--amber);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ---------- setup ---------- */
+
+.setup {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+  display: grid;
+  gap: 20px;
+}
+
+.setup__title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.setup__error {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--red);
+  color: var(--red);
+}
+
+.setup .button--primary {
+  justify-self: start;
+  padding: 11px 26px;
+  font-size: 17px;
+}
+
+.field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.field > legend,
+.field > label,
+.field__static-label {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 0;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 16px;
+}
+
+.field__static {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 17px;
+}
+
+select,
+textarea {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  color: var(--paper);
+  background: var(--ink-raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 10px;
+}
+
+textarea {
+  resize: vertical;
+  line-height: 1.4;
+}
+
+textarea::placeholder {
+  color: #5f6b7e;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice {
+  position: relative;
+}
+
+/* The real radio button stays (keyboard and screen readers use it); the pill beside it is what you see. */
+.choice input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.choice span {
+  display: block;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--ink-raised);
+}
+
+.choice input:checked + span {
+  color: var(--amber);
+  border-color: var(--amber);
+  background: rgba(227, 169, 59, 0.1);
+}
+
+.choice input:focus-visible + span {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* ---------- call ---------- */
+
+.call {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.call__header {
+  flex: none;
+  padding: 10px 16px 10px;
+  background: var(--ink-raised);
+  border-bottom: 1px solid var(--line);
+}
+
+.call__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.call__status {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.call__status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.call__status[data-state='listening'] .call__status-dot {
+  background: var(--teal);
+}
+
+.call__status[data-state='speaking'] .call__status-dot {
+  background: var(--amber);
+}
+
+.call__status[data-state='reconnecting'] .call__status-dot {
+  background: var(--red);
+}
+
+.call__summary {
+  margin: 4px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.call__error {
+  margin: 8px 0 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--red);
+  color: var(--red);
+  font-size: 14px;
+}
+
+.call__notice {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--amber);
+}
+
+.feed {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 16px 28px;
+}
+
+.feed__empty {
+  margin: 32px 0;
+  color: var(--muted);
+}
+
+/* ---------- one sentence ---------- */
+
+.entry {
+  padding: 16px 0 14px;
+  border-bottom: 1px solid var(--line);
+  opacity: 0.74; /* older sentences step back; the newest one is at full strength */
+  transition: opacity 0.2s;
+}
+
+.entry--latest,
+.entry:hover,
+.entry:focus-within {
+  opacity: 1;
+}
+
+.entry__original {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1.32;
+  color: var(--paper);
+}
+
+.entry__translation {
+  margin: 6px 0 0;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--teal);
+}
+
+.entry__failed {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--red);
+}
+
+.entry__loading {
+  height: 2px;
+  margin: 12px 0 6px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, var(--line) 0%, var(--teal) 50%, var(--line) 100%) 0 0 / 200% 100%;
+  animation: slide 1.4s linear infinite;
+}
+
+@keyframes slide {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.entry__actions {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button--hint {
+  padding: 5px 11px;
+  font-size: 14px;
+  color: var(--amber);
+  border-color: rgba(227, 169, 59, 0.45);
+}
+
+.button--hint[aria-pressed='true'] {
+  background: rgba(227, 169, 59, 0.16);
+  border-color: var(--amber);
+}
+
+.keycap {
+  margin-left: 7px;
+  padding: 0 5px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--paper);
+  border: 1px solid var(--muted);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+}
+
+.entry__hint {
+  margin-top: 12px;
+  padding-left: 12px;
+  border-left: 2px solid var(--amber);
+}
+
+.entry__hint-text {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+  white-space: pre-wrap; /* keep the line breaks of the hint (its Russian part starts on a new line) */
+}
+
+/* ---------- the phrase being spoken now ---------- */
+
+.live {
+  margin: 0;
+  padding: 16px 0 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1.32;
+}
+
+.live__guess {
+  color: var(--muted);
+}
+
+.live__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 10px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.live__dot[data-speaking='true'] {
+  background: var(--amber);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  50% {
+    transform: scale(1.7);
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live__dot[data-speaking='true'],
+  .entry__loading {
+    animation: none;
+  }
 }
