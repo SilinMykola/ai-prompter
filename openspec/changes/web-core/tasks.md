@@ -18,9 +18,9 @@
 
 ## 4. Connection client
 
-- [ ] 4.1 Write failing tests in `web/src/lib/connection.test.ts` (fake WebSocket, fake timers) for `start` first, audio dropped when not open, reconnect schedule, new `start` after a reconnect, giving up, schedule reset after a stable connection, id shifting both ways, a request for an old card, orderly stop with and without a server answer, no reconnect after stop, message order, and server errors passed on; verify they fail
-- [ ] 4.2 Implement `createConnection` in `web/src/lib/connection.ts`; verify the tests pass
-- [ ] 4.3 Break the id offset and the retry limit in turn, verify tests fail, restore
+- [x] 4.1 Write failing tests in `web/src/lib/connection.test.ts` (fake WebSocket, fake timers) for `start` first, audio dropped when not open, reconnect schedule, new `start` after a reconnect, giving up, schedule reset after a stable connection, id shifting both ways, a request for an old card, orderly stop with and without a server answer, no reconnect after stop, message order, and server errors passed on; verify they fail
+- [x] 4.2 Implement `createConnection` in `web/src/lib/connection.ts`; verify the tests pass
+- [x] 4.3 Break the id offset and the retry limit in turn, verify tests fail, restore
 
 ## 5. Audio capture
 
