@@ -1,0 +1,32 @@
+schema: spec-driven
+
+context: |
+  Language: English
+  All artifacts must be written in English.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Project: ai-prompter. Local web app that listens to a Chrome tab (Google Meet),
+  shows live DE/EN transcription with Russian translation and on-demand reply hints.
+  The full original brief is SPEC.md in the repo root; the implementation plan is
+  docs/superpowers/plans/2026-10-12-ai-prompter.md.
+  Stack: npm workspaces (shared, server, web), TypeScript strict, Node 20+, Express,
+  ws, Deepgram streaming STT, Gemini and Claude behind one LlmProvider interface,
+  Vite + React 18, Vitest.
+  Conventions: React function components and hooks only (no classes); plain CSS;
+  code comments are explanatory because the code is a learning reference;
+  privacy: nothing persisted to disk, no conversation text in server logs.
+
+rules:
+  proposal:
+    - State what is out of scope (see section 11 of SPEC.md)
+  tasks:
+    - Follow TDD: each implementation task is preceded by a failing test task
+    - After a test passes, break the behaviour once to confirm the test fails, then restore it
+  design:
+    - Keep server code unaware of which LLM provider is selected
+
+operations:
+  apply:
+    guidance:
+      - Write the failing test first, run it, then implement
+      - Never log transcript, translation, hint, context or profile text
