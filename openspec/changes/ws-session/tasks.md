@@ -27,5 +27,5 @@
 ## 5. Wiring and live check
 
 - [x] 5.1 Wire the real Deepgram provider and registry in `server/src/index.ts`; verify `npm run typecheck`
-- [ ] 5.2 Run a live check: start the real server, connect with a `ws` client from a script, send `start` (default models) and the synthesised German WAV, and see `status`, `interim`, `sentence` and `stopped` messages; check the server log has event names only
-- [ ] 5.3 Document the endpoint and the origin rule in the README; run `npm test`, `npm run typecheck` and the code-review skill; fix findings
+- [x] 5.2 Run a live check: start the real server, connect with a `ws` client from a script, send `start` (default models) and the synthesised German WAV, and see `status`, `interim`, `sentence` and `stopped` messages; check the server log has event names only
+- [x] 5.3 Document the endpoint and the origin rule in the README; run `npm test`, `npm run typecheck` and the code-review skill; fix findings

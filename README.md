@@ -34,6 +34,14 @@ Call tab (Chrome) --getDisplayMedia--> web (React) --WebSocket /ws--> server (No
 
 The server listens on `127.0.0.1` only. API keys stay on the server.
 
+## Call session (`/ws`)
+
+One WebSocket connection is one call. The first message must be a valid `start`; the server then opens a Deepgram stream, forwards audio, and sends back `status`, `interim` (the live phrase) and `sentence` messages. `stop` (or closing the tab) ends the session, delivering the last words first. Hints and re-translation are accepted but not implemented yet.
+
+Only pages from your own machine may connect: the server refuses a WebSocket whose `Host` is not `localhost` / `127.0.0.1` / `[::1]` or whose `Origin` differs from `Host`. Without this, any web page open in your browser could use your API keys through `ws://127.0.0.1:8787/ws`.
+
+The server log contains event names, provider and model names, and error codes, but never text from a call.
+
 ## Speech recognition
 
 Audio goes to Deepgram's live endpoint (`wss://api.deepgram.com/v1/listen`) over a plain WebSocket, behind the `SttProvider` interface in `server/src/stt/`. Settings: `interim_results`, `smart_format`, `punctuate`, `endpointing=300`, `utterance_end_ms=1000`, `vad_events`; no `encoding`/`sample_rate`, because the browser sends a webm container. `language=multi` (Nova-3) covers German and English. A lost connection is retried after 0.5, 1, 2, 4 and 8 seconds; the browser is then asked to restart its recorder so the new connection gets a fresh webm header.
