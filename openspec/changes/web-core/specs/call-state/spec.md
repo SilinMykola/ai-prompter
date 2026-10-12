@@ -59,11 +59,15 @@ Each `sentence` message SHALL add one card, in order of arrival, with its text, 
 - **THEN** the card's hint is marked failed
 
 ### Requirement: Errors and recovery
-An `error` message SHALL set the error line; a `status` of `listening` SHALL clear a recoverable connection note but SHALL NOT remove an error that came from the server.
+An `error` message SHALL set the error line, and later `status` messages SHALL NOT remove it.
 
 #### Scenario: Server error
 - **WHEN** an `error` message arrives with a text
 - **THEN** the state's error line is that text
+
+#### Scenario: Error stays
+- **WHEN** a `status` message arrives after an `error`
+- **THEN** the error line is unchanged
 
 ### Requirement: Last finished sentence
 The state SHALL be able to tell which card is the latest one, for hotkeys.
@@ -73,8 +77,12 @@ The state SHALL be able to tell which card is the latest one, for hotkeys.
 - **THEN** the latest card is id 3
 
 ### Requirement: Cards survive a new server session
-After the connection is re-established the existing cards and their texts SHALL stay, and the live phrase and status SHALL reset.
+After the connection is re-established the existing cards and their texts SHALL stay, the live phrase, status and error line SHALL reset, and translations or hints that were still arriving SHALL be marked failed because the new session cannot finish them.
 
 #### Scenario: Reconnect
 - **WHEN** the connection layer reports a new session
 - **THEN** all cards remain and the live phrase is empty
+
+#### Scenario: Unfinished work
+- **WHEN** a new session starts while a card's translation is still streaming
+- **THEN** that translation is marked failed and its text so far stays

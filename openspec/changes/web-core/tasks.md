@@ -2,13 +2,13 @@
 
 ## 1. Test setup for the web app
 
-- [ ] 1.1 Install `jsdom`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event` in `web`; add a `web` project (jsdom environment, setup file with jest-dom matchers) to the root `vitest.config.ts`; add a trivial failing test, see it fail, make it pass, delete it; verify `npm test` runs the web project
+- [x] 1.1 Install `jsdom`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event` in `web`; add a `web` project (jsdom environment, setup file with jest-dom matchers) to the root `vitest.config.ts`; add a trivial failing test, see it fail, make it pass, delete it; verify `npm test` runs the web project
 
 ## 2. Call state reducer
 
-- [ ] 2.1 Write failing tests in `web/src/lib/callReducer.test.ts` for status, live phrase, new sentence, duplicate id, translation deltas/done/error/retry, unknown card, hint start/delta/done/error and replacement, server error, latest card, and `session_restarted` keeping cards but resetting live state; verify they fail
-- [ ] 2.2 Implement `callReducer`, `initialCallState`, `latestCard` in `web/src/lib/callReducer.ts` with explanatory comments; verify the tests pass
-- [ ] 2.3 Break the duplicate-id rule and the retry replacement in turn, verify tests fail, restore
+- [x] 2.1 Write failing tests in `web/src/lib/callReducer.test.ts` for status, live phrase, new sentence, duplicate id, translation deltas/done/error/retry, unknown card, hint start/delta/done/error and replacement, server error, latest card, and `session_restarted` keeping cards but resetting live state; verify they fail
+- [x] 2.2 Implement `callReducer`, `initialCallState`, `latestCard` in `web/src/lib/callReducer.ts` with explanatory comments; verify the tests pass
+- [x] 2.3 Break the duplicate-id rule and the retry replacement in turn, verify tests fail, restore
 
 ## 3. Settings
 
