@@ -240,3 +240,47 @@ describe('failures', () => {
     await expect(createCapture('tab', { onEnded }, deps)).rejects.toThrow(message);
   });
 });
+
+describe('review fixes', () => {
+  it('keeps delivering after one chunk fails to read or to be handled', async () => {
+    const { deps, onEnded } = setup();
+    const capture = await createCapture('tab', { onEnded }, deps);
+    const chunks: number[][] = [];
+    let first = true;
+    capture.start((chunk) => {
+      if (first) {
+        first = false;
+        throw new Error('socket closing'); // the handler fails once
+      }
+      chunks.push(Array.from(chunk));
+    });
+
+    lastRecorder().produce([1]);
+    lastRecorder().produce([2]);
+    lastRecorder().ondataavailable?.({ data: { size: 1, arrayBuffer: () => Promise.reject(new Error('unreadable')) } });
+    lastRecorder().produce([3]);
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(chunks).toEqual([[2], [3]]);
+  });
+
+  it('does not start or restart a recording after stop', async () => {
+    const { deps, onEnded } = setup();
+    const capture = await createCapture('tab', { onEnded }, deps);
+    capture.stop();
+
+    capture.start(() => {});
+    capture.restart();
+
+    expect(FakeRecorder.instances).toHaveLength(0);
+  });
+
+  it('does not tell a microphone user to share a tab', async () => {
+    const { deps, onEnded } = setup({ audio: false, video: false });
+
+    const attempt = createCapture('mic', { onEnded }, deps);
+
+    await expect(attempt).rejects.toThrow(/микрофон/i);
+    await expect(attempt).rejects.not.toThrow(/вкладк/i);
+  });
+});

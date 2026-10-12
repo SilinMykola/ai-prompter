@@ -14,7 +14,8 @@ export class CaptureError extends Error {
   }
 }
 
-const NO_AUDIO_MESSAGE = 'Звук не захвачен. Выберите вкладку Chrome и включите «Также поделиться звуком вкладки».';
+const NO_TAB_AUDIO_MESSAGE = 'Звук не захвачен. Выберите вкладку Chrome и включите «Также поделиться звуком вкладки».';
+const NO_MIC_AUDIO_MESSAGE = 'Микрофон не отдаёт звук. Проверьте, что он подключён и разрешён в браузере.';
 const MIME_TYPE = 'audio/webm;codecs=opus';
 const CHUNK_MS = 250;
 
@@ -68,7 +69,7 @@ export async function createCapture(
   const audioTracks = stream.getAudioTracks();
   if (audioTracks.length === 0) {
     stream.getTracks().forEach((track) => track.stop()); // otherwise the browser keeps showing "sharing"
-    throw new CaptureError(NO_AUDIO_MESSAGE);
+    throw new CaptureError(source === 'tab' ? NO_TAB_AUDIO_MESSAGE : NO_MIC_AUDIO_MESSAGE);
   }
 
   // The recorder gets only the audio. The video track stays untouched (and running) until we stop.
@@ -97,10 +98,13 @@ export async function createCapture(
     const current = new deps.MediaRecorder(audioStream, { mimeType: MIME_TYPE });
     current.ondataavailable = (event) => {
       if (event.data.size === 0) return;
-      delivery = delivery.then(async () => {
-        const bytes = new Uint8Array(await event.data.arrayBuffer());
-        if (!stopped && recorder === current) onChunk?.(bytes); // nothing from a replaced recorder
-      });
+      delivery = delivery
+        .then(async () => {
+          const bytes = new Uint8Array(await event.data.arrayBuffer());
+          if (!stopped && recorder === current) onChunk?.(bytes); // nothing from a replaced recorder
+        })
+        // One bad chunk (unreadable data, a handler that throws) must not stop all the later ones.
+        .catch(() => {});
     };
     recorder = current;
     current.start(CHUNK_MS);
@@ -115,11 +119,13 @@ export async function createCapture(
 
   return {
     start(callback) {
+      if (stopped) return;
       onChunk = callback;
       stopRecorder();
       record();
     },
     restart() {
+      if (stopped) return;
       stopRecorder();
       record();
     },

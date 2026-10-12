@@ -42,12 +42,27 @@ Recording SHALL be restartable on the same audio stream, so that the next chunk 
 - **WHEN** the recording is restarted
 - **THEN** the old recorder is stopped and a new one is started on the same audio tracks
 
+### Requirement: Failures do not stop the stream
+A chunk that cannot be read or handled SHALL NOT stop later chunks from being delivered, and starting or restarting after the capture was stopped SHALL do nothing.
+
+#### Scenario: One bad chunk
+- **WHEN** one chunk fails to be read
+- **THEN** the next chunk is still delivered
+
+#### Scenario: Use after stop
+- **WHEN** a restart is requested after the capture was stopped
+- **THEN** no recorder is created
+
 ### Requirement: Microphone source
 The microphone source SHALL request audio only and otherwise behave like tab capture.
 
 #### Scenario: Microphone
 - **WHEN** the source is the microphone
 - **THEN** audio is requested without video and recording works the same way
+
+#### Scenario: Microphone without audio
+- **WHEN** the microphone stream has no audio track
+- **THEN** the error talks about the microphone, not about sharing a tab
 
 ### Requirement: Ending sharing ends the capture
 When any captured track ends, for example because the user clicked "Stop sharing", the caller SHALL be told so exactly once.

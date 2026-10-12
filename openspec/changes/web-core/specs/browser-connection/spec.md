@@ -18,7 +18,7 @@ After the connection opens the client SHALL send `start` with the chosen setting
 - **THEN** they are dropped and not queued
 
 ### Requirement: Session ready signal
-The client SHALL tell the caller when the server has confirmed a session (its first message after `start`), saying whether it is a new session after a lost connection, so that the caller starts or restarts the recorder only then.
+The client SHALL tell the caller when the server has confirmed a session (its first `status` message after `start`; an `error` is not a confirmation), saying whether it is a new session after a lost connection, so that the caller starts or restarts the recorder only then.
 
 #### Scenario: First session
 - **WHEN** the server's first message arrives on the first connection
@@ -61,6 +61,20 @@ Sentence ids from a later server session SHALL be shifted so that they never equ
 #### Scenario: Request for an old card
 - **WHEN** the user asks for a hint on card 2 and the current session started after card 3
 - **THEN** nothing is sent and the caller is told the card is no longer available
+
+### Requirement: The server may end the session
+When the server ends a session on purpose, by sending an `error` or `status` `stopped` and then closing the connection, the client SHALL NOT reconnect and SHALL tell the caller the session ended.
+
+#### Scenario: Rejected key
+- **WHEN** the server sends an `error` and closes the connection
+- **THEN** no reconnect is attempted and the caller is told the session ended
+
+### Requirement: Requests that cannot be sent are reported
+A hint or retranslate request that cannot be sent because the connection is down or not yet confirmed SHALL be reported to the caller instead of being dropped silently.
+
+#### Scenario: Click during an outage
+- **WHEN** the user asks for a hint while the connection is down
+- **THEN** the caller is told the card is unavailable
 
 ### Requirement: Orderly stop
 Stopping SHALL send `stop`, wait for the server to close the connection or two seconds, and then close the socket without reconnecting.

@@ -30,8 +30,10 @@ export interface ConnectionOptions {
   onReconnecting(): void;
   /** All retries failed. */
   onGaveUp(): void;
-  /** A request was refused because the card belongs to an older server session. */
+  /** A hint/retranslate request could not be sent: the card belongs to an older server session, or the connection is down. */
   onCardUnavailable(id: number): void;
+  /** The server ended the session on purpose (an error, or "stopped"). No reconnect follows. */
+  onSessionEnded(): void;
   createSocket?: (url: string) => WebSocketLike;
 }
 
@@ -57,6 +59,7 @@ export function createConnection(options: ConnectionOptions): Connection {
   let isOpen = false; // the socket is open
   let isReady = false; // ...and the server has answered our `start`
   let hasBeenReady = false; // some earlier socket was ready: the next one is a reconnect
+  let serverEnded = false; // the server said it is finished with this session (error or "stopped")
   let inOutage = false;
   let retries = 0;
   let stopping = false;
@@ -82,12 +85,15 @@ export function createConnection(options: ConnectionOptions): Connection {
     }
     if (typeof message !== 'object' || message === null || typeof message.type !== 'string') return;
 
-    // The first answer after `start` means the server accepted the session.
-    if (!isReady) {
+    // The server's first `status` after `start` means it accepted the session.
+    // (An `error` instead means it refused: nothing to record for.)
+    if (!isReady && message.type === 'status') {
       isReady = true;
       options.onSessionReady(hasBeenReady);
       hasBeenReady = true;
     }
+    // The server closes the connection right after these, on purpose: reconnecting would only repeat the failure.
+    if (message.type === 'error' || (message.type === 'status' && message.state === 'stopped')) serverEnded = true;
 
     // Every server session numbers its sentences from 1. Shift them so the app sees
     // one continuous numbering (messages about a sentence all carry the same `id`).
@@ -116,6 +122,7 @@ export function createConnection(options: ConnectionOptions): Connection {
     socket = current;
     isOpen = false;
     isReady = false;
+    serverEnded = false;
 
     current.onopen = () => {
       isOpen = true;
@@ -137,6 +144,8 @@ export function createConnection(options: ConnectionOptions): Connection {
       if (stopping) {
         clearTimeout(stopTimer);
         finishStop?.();
+      } else if (serverEnded) {
+        options.onSessionEnded();
       } else {
         scheduleRetry();
       }
@@ -151,7 +160,10 @@ export function createConnection(options: ConnectionOptions): Connection {
   }
 
   function request(id: number, build: (serverId: number) => ClientMessage): void {
-    if (!isOpen || !isReady) return;
+    if (!isOpen || !isReady) {
+      options.onCardUnavailable(id); // the click must not vanish without a trace
+      return;
+    }
     const serverId = serverIdFor(id);
     if (serverId === undefined) {
       options.onCardUnavailable(id);

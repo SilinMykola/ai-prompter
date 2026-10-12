@@ -30,4 +30,4 @@
 
 ## 6. Wrap-up
 
-- [ ] 6.1 Run `npm test` and `npm run typecheck`; run the code-review skill on the new files; fix findings; verify both commands pass again
+- [x] 6.1 Run `npm test` and `npm run typecheck`; run the code-review skill on the new files; fix findings; verify both commands pass again

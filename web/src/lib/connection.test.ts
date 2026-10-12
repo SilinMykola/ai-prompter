@@ -60,6 +60,7 @@ function setup() {
     reconnecting: 0,
     gaveUp: 0,
     unavailable: [] as number[],
+    ended: 0,
   };
   const options: ConnectionOptions = {
     url: 'ws://test/ws',
@@ -69,6 +70,7 @@ function setup() {
     onReconnecting: () => calls.reconnecting++,
     onGaveUp: () => calls.gaveUp++,
     onCardUnavailable: (id) => calls.unavailable.push(id),
+    onSessionEnded: () => calls.ended++,
     createSocket: (url) => {
       const socket = new FakeSocket(url);
       sockets.push(socket);
@@ -355,5 +357,44 @@ describe('stopping', () => {
     await Promise.all([first, second]);
 
     expect(kit.sockets[0].json.filter((m) => m.type === 'stop')).toHaveLength(1);
+  });
+});
+
+describe('review fixes', () => {
+  it.each([
+    ['an error', { type: 'error', message: 'Ключ отклонён' } as ServerMessage],
+    ['"stopped"', { type: 'status', state: 'stopped' } as ServerMessage],
+  ])('does not reconnect when the server ends the session after %s', (_name, message) => {
+    const kit = connected();
+
+    kit.sockets[0].receive(message);
+    kit.sockets[0].drop();
+    vi.advanceTimersByTime(60_000);
+
+    expect(kit.sockets).toHaveLength(1);
+    expect(kit.calls.ended).toBe(1);
+    expect(kit.calls.reconnecting).toBe(0);
+    expect(kit.calls.gaveUp).toBe(0);
+  });
+
+  it('does not treat an error as the confirmation of a session', () => {
+    const kit = setup();
+    kit.sockets[0].open();
+
+    kit.sockets[0].receive({ type: 'error', message: 'Сессия отклонена' });
+
+    expect(kit.calls.ready).toEqual([]);
+    expect(kit.calls.messages).toEqual([{ type: 'error', message: 'Сессия отклонена' }]);
+  });
+
+  it('refuses hint and retranslate requests while the connection is down, and says so', () => {
+    const kit = connected();
+    kit.sockets[0].receive({ type: 'sentence', id: 1, text: 'Eins.' });
+    kit.sockets[0].drop();
+
+    kit.connection.requestHint(1, 'short');
+    kit.connection.retranslate(1);
+
+    expect(kit.calls.unavailable).toEqual([1, 1]);
   });
 });
