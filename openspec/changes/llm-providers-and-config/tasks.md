@@ -17,11 +17,11 @@
 
 ## 3. Providers
 
-- [ ] 3.1 Define `LlmProvider`, `LlmRequest` in `server/src/llm/types.ts`; write failing tests in `server/src/llm/gemini.test.ts` with a fake client for chunk order, passed limits, abort ending the stream quietly, error mapping, low-latency thinking setting, and the retry on HTTP 400 remembered per model; verify they fail
-- [ ] 3.2 Implement `createGeminiProvider` in `server/src/llm/gemini.ts` (listing and streaming); verify the tests pass
-- [ ] 3.3 Write failing tests in `server/src/llm/anthropic.test.ts` with a fake client for chunk order, limits, abort, error mapping and listing; verify they fail, then implement `createAnthropicProvider` in `server/src/llm/anthropic.ts` and verify they pass
-- [ ] 3.4 Break the chunk order and the abort handling in turn, verify tests fail, restore
-- [ ] 3.5 Run a manual check against the real Gemini API with the key from `.env` (list models, stream a short translation, abort one stream); verify output and that no key appears in logs
+- [x] 3.1 Define `LlmProvider`, `LlmRequest` in `server/src/llm/types.ts`; write failing tests in `server/src/llm/gemini.test.ts` with a fake client for chunk order, passed limits, abort ending the stream quietly, error mapping, low-latency thinking setting, and the retry on HTTP 400 remembered per model; verify they fail
+- [x] 3.2 Implement `createGeminiProvider` in `server/src/llm/gemini.ts` (listing and streaming); verify the tests pass
+- [x] 3.3 Write failing tests in `server/src/llm/anthropic.test.ts` with a fake client for chunk order, limits, abort, error mapping and listing; verify they fail, then implement `createAnthropicProvider` in `server/src/llm/anthropic.ts` and verify they pass
+- [x] 3.4 Break the chunk order and the abort handling in turn, verify tests fail, restore
+- [x] 3.5 Run a manual check against the real Gemini API with the key from `.env` (list models, stream a short translation, abort one stream); verify output and that no key appears in logs
 
 ## 4. Registry, validation and endpoint
 
