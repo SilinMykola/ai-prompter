@@ -77,9 +77,15 @@ function generationOf(id: string): string {
   return versionOf(id).join('.');
 }
 
+// Measured on 2026-10-13 with real calls: the newest flash-lite took 7-11 s to the first word (the
+// translation timeout is 10 s) and the newer flash models answered 503, while this one answered in
+// 1-3 s every time. When it is on offer it is the default for translation.
+const PREFERRED_TRANSLATION = 'gemini-2.5-flash';
+
 export function pickDefaults(ids: string[]): DefaultModels {
   if (ids.length === 0) throw new Error('Cannot pick default models from an empty list');
-  const translation = newestMatching(ids, [/flash-lite|haiku/, /flash/]);
+  const newestLite = newestMatching(ids, [/flash-lite|haiku/, /flash/]);
+  const translation = ids.includes(PREFERRED_TRANSLATION) ? PREFERRED_TRANSLATION : newestLite;
 
   // For hints: a bigger model than the one used for translation, but not a risky one.
   //  - Claude: the newest sonnet.
@@ -87,7 +93,7 @@ export function pickDefaults(ids: string[]): DefaultModels {
   //    and settled); the very newest flash is often overloaded or slow to start. Pro models come
   //    last because they often have no free quota, so as a default they would fail out of the box.
   const plainFlash = ids.filter((id) => /flash(?!-lite)/.test(id));
-  const sameGeneration = plainFlash.filter((id) => generationOf(id) === generationOf(translation));
+  const sameGeneration = plainFlash.filter((id) => generationOf(id) === generationOf(newestLite));
   const hint = /sonnet/.test(ids.join(' '))
     ? newestMatching(ids, [/sonnet/])
     : sameGeneration.length > 0
