@@ -23,11 +23,22 @@ function memoryStorage(initial: Record<string, string> = {}) {
 
 const KEY = 'ai-prompter.settings';
 
+describe('target language', () => {
+  it('is remembered and restored; an unknown value falls back to Russian', () => {
+    const remembered = memoryStorage({ [KEY]: JSON.stringify({ targetLanguage: 'de' }) });
+    expect(resolveSettings(config, remembered.storage).targetLanguage).toBe('de');
+
+    const broken = memoryStorage({ [KEY]: JSON.stringify({ targetLanguage: 'fr' }) });
+    expect(resolveSettings(config, broken.storage).targetLanguage).toBe('ru');
+  });
+});
+
 describe('default settings', () => {
   it('are used on a first visit', () => {
     expect(resolveSettings(config, memoryStorage().storage)).toEqual({
       audioSource: 'tab',
       language: 'de',
+      targetLanguage: 'ru',
       provider: 'gemini',
       translationModel: 'g-fast',
       hintModel: 'g-strong',
@@ -57,6 +68,7 @@ describe('remembered settings', () => {
     expect(resolveSettings(config, storage)).toEqual({
       audioSource: 'mic',
       language: 'multi',
+      targetLanguage: 'ru',
       provider: 'anthropic',
       translationModel: 'c-strong',
       hintModel: 'c-fast',
@@ -75,6 +87,7 @@ describe('remembered settings', () => {
     expect(saved).toEqual({
       audioSource: 'tab',
       language: 'de',
+      targetLanguage: 'ru',
       provider: 'gemini',
       translationModel: 'g-fast',
       hintModel: 'g-strong',

@@ -528,6 +528,30 @@ describe('translation in the session', () => {
     });
   });
 
+  it('does not translate a sentence that is already in the target language', async () => {
+    const { service, translate, connection } = await running();
+
+    service.onResult(sentence('Здравствуйте, у меня есть вопрос. Ich habe einen Termin am Montag.'));
+
+    expect(translate).toHaveBeenCalledTimes(1);
+    expect(translate.mock.calls[0][0].context.sentence).toBe('Ich habe einen Termin am Montag.');
+    // The Russian card is closed at once, so it shows no spinner and no failure.
+    expect(connection.messages).toContainEqual({ type: 'translation_done', id: 1 });
+  });
+
+  it('translates into the language chosen on the setup screen', async () => {
+    const kit = setup();
+    await start(kit.session, { ...validStart, targetLanguage: 'de' });
+    const service = kit.stt.opened[0].handlers;
+
+    service.onResult(sentence('Здравствуйте, у меня есть вопрос. Ich habe einen Termin am Montag.'));
+
+    expect(kit.translate).toHaveBeenCalledTimes(1);
+    expect(kit.translate.mock.calls[0][0]).toMatchObject({
+      context: { sentence: 'Здравствуйте, у меня есть вопрос.', targetLanguage: 'de' },
+    });
+  });
+
   it('starts the second translation without waiting for the first', async () => {
     const { service, translate } = await running();
     translate.mockImplementation(() => new Promise(() => {})); // never finishes

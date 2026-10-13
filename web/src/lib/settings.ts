@@ -1,4 +1,4 @@
-import type { ApiConfig, Language, ProviderId, ProviderInfo } from '@ai-prompter/shared/protocol';
+import type { ApiConfig, Language, ProviderId, ProviderInfo, TargetLanguage } from '@ai-prompter/shared/protocol';
 
 // The choices a user makes on the setup screen, and what is remembered between visits.
 
@@ -7,6 +7,8 @@ export type AudioSource = 'tab' | 'mic';
 export interface Settings {
   audioSource: AudioSource;
   language: Language;
+  /** What the other person's sentences are translated into. */
+  targetLanguage: TargetLanguage;
   provider: ProviderId;
   translationModel: string;
   hintModel: string;
@@ -26,6 +28,7 @@ const STORAGE_KEY = 'ai-prompter.settings';
 
 const AUDIO_SOURCES: AudioSource[] = ['tab', 'mic'];
 const LANGUAGES: Language[] = ['de', 'en', 'multi'];
+const TARGET_LANGUAGES: TargetLanguage[] = ['ru', 'uk', 'de', 'en'];
 
 function providerInfo(config: ApiConfig, id: ProviderId): ProviderInfo {
   return config.providers.find((p) => p.id === id) ?? config.providers.find((p) => p.id === config.defaultProvider)!;
@@ -59,6 +62,7 @@ export function resolveSettings(config: ApiConfig, storage: StorageLike | undefi
   return {
     audioSource: AUDIO_SOURCES.includes(stored.audioSource as AudioSource) ? (stored.audioSource as AudioSource) : 'tab',
     language: LANGUAGES.includes(stored.language as Language) ? (stored.language as Language) : 'de',
+    targetLanguage: TARGET_LANGUAGES.includes(stored.targetLanguage as TargetLanguage) ? (stored.targetLanguage as TargetLanguage) : 'ru',
     provider: provider.id,
     translationModel: pickModel(stored.translationModel, provider.defaultTranslationModel),
     hintModel: pickModel(stored.hintModel, provider.defaultHintModel),
@@ -75,6 +79,7 @@ export function saveSettings(settings: Settings, storage: StorageLike | undefine
       JSON.stringify({
         audioSource: settings.audioSource,
         language: settings.language,
+        targetLanguage: settings.targetLanguage,
         provider: settings.provider,
         translationModel: settings.translationModel,
         hintModel: settings.hintModel,

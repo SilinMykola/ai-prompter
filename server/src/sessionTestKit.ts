@@ -15,6 +15,7 @@ export const fakeRegistry = {
 export const validStart = {
   type: 'start',
   language: 'de',
+  targetLanguage: 'ru',
   provider: 'gemini',
   translationModel: 'fast',
   hintModel: 'strong',

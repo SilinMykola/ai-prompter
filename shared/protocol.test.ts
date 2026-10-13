@@ -50,6 +50,7 @@ describe('client messages', () => {
     {
       type: 'start',
       language: 'multi',
+      targetLanguage: 'ru',
       provider: 'gemini',
       translationModel: 'fast-model',
       hintModel: 'strong-model',

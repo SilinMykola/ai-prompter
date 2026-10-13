@@ -12,6 +12,13 @@ describe('translation prompt: instructions', () => {
     expect(system).toMatch(/only the translation/i);
   });
 
+  it('translates into the chosen target language instead of Russian', () => {
+    const { system } = buildTranslationPrompt({ ...base, targetLanguage: 'de' });
+
+    expect(system).toMatch(/into German/);
+    expect(system).not.toMatch(/Russian/);
+  });
+
   it('asks to keep names, numbers, dates, documents and institutions exact', () => {
     expect(system).toMatch(/names, numbers, dates, document names and institutions/i);
   });

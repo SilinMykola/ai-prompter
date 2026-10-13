@@ -6,6 +6,9 @@ import type { ApiConfig } from '@ai-prompter/shared/protocol';
 import { resolveSettings, type Settings } from '../lib/settings';
 import { SetupScreen } from './SetupScreen';
 
+/** The "Язык звонка" group: other groups have radios with the same names. */
+const callLanguage = () => within(screen.getByRole('group', { name: 'Язык звонка' }));
+
 const twoProviders: ApiConfig = {
   defaultProvider: 'gemini',
   providers: [
@@ -45,12 +48,23 @@ describe('setup screen', () => {
 
     expect(screen.getByRole('radio', { name: 'Вкладка Chrome' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Микрофон' })).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Немецкий' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Английский' })).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Авто (DE+EN)' })).not.toBeChecked();
+    expect(callLanguage().getByRole('radio', { name: 'Немецкий' })).toBeChecked();
+    expect(callLanguage().getByRole('radio', { name: 'Английский' })).not.toBeChecked();
+    expect(callLanguage().getByRole('radio', { name: 'Авто (DE+EN)' })).not.toBeChecked();
     expect(screen.getByLabelText('Провайдер')).toHaveValue('gemini');
     expect(screen.getByLabelText('Модель перевода')).toHaveValue('g-fast');
     expect(screen.getByLabelText('Модель подсказок')).toHaveValue('g-strong');
+  });
+
+  it('lets the user pick the language to translate into, separate from the call language', async () => {
+    const { onStart, user } = renderScreen(twoProviders);
+    const target = within(screen.getByRole('group', { name: 'Переводить на' }));
+
+    expect(target.getByRole('radio', { name: 'Русский' })).toBeChecked();
+    await user.click(target.getByRole('radio', { name: 'Немецкий' }));
+    await user.click(screen.getByRole('button', { name: 'Начать' }));
+
+    expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ targetLanguage: 'de', language: 'de' }));
   });
 
   it('has the two text fields with their placeholders, empty at first', () => {
@@ -95,7 +109,7 @@ describe('setup screen', () => {
     const { user, changes } = renderScreen(twoProviders);
 
     await user.click(screen.getByRole('radio', { name: 'Микрофон' }));
-    await user.click(screen.getByRole('radio', { name: 'Авто (DE+EN)' }));
+    await user.click(callLanguage().getByRole('radio', { name: 'Авто (DE+EN)' }));
     await user.selectOptions(screen.getByLabelText('Модель подсказок'), 'g-fast');
     await user.type(screen.getByLabelText('Контекст звонка'), 'Arzt');
     await user.type(screen.getByLabelText('Мои данные'), 'Ich');
@@ -111,7 +125,7 @@ describe('setup screen', () => {
 
   it('starts the call with the current settings when "Начать" is pressed', async () => {
     const { user, onStart } = renderScreen(twoProviders);
-    await user.click(screen.getByRole('radio', { name: 'Английский' }));
+    await user.click(callLanguage().getByRole('radio', { name: 'Английский' }));
 
     await user.click(screen.getByRole('button', { name: 'Начать' }));
 

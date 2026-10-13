@@ -36,7 +36,9 @@ The server listens on `127.0.0.1` only. API keys stay on the server.
 
 ## Translation
 
-Every finished sentence is translated into Russian at once, in parallel, by the translation model you chose, and streamed into its card (about one second to the first words with the default fast Gemini model). A failed or timed-out (10 s) translation is retried once; after a provider rate limit the app says so in a short note, waits 2 seconds and retries. A card that still fails shows "перевод не получен" with a "повторить" button.
+Every finished sentence is translated at once, in parallel, by the translation model you chose, and streamed into its card (about one second to the first words with the default fast Gemini model). A failed or timed-out (10 s) translation is retried once; after a provider rate limit the app says so in a short note, waits 2 seconds and retries. A card that still fails shows "перевод не получен" with a "повторить" button.
+
+The target language is chosen on the setup screen ("Переводить на": Russian by default, also Ukrainian, German, English) and sent in `start` as `targetLanguage`. A sentence that is clearly already in that language is not translated and its card shows no translation (the server guesses the language by alphabet and common words, in `server/src/languageDetect.ts`; when unsure, it translates). Reply hints still answer with a Russian translation whatever the target is. Translating both ways in one call is not supported yet.
 
 The prompt gives the model the call context and up to four earlier sentences (as context only); your personal data ("Мои данные") is never part of a translation request. Two messages were added to the protocol for this: `translation_start` (empties a card's translation when an attempt restarts) and `notice` (a short note that disappears by itself).
 

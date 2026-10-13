@@ -13,6 +13,7 @@ const registry = {
 const validStart = {
   type: 'start',
   language: 'de',
+  targetLanguage: 'ru',
   provider: 'gemini',
   translationModel: 'fast',
   hintModel: 'strong',
@@ -25,6 +26,17 @@ describe('validateStart', () => {
     const result = await validateStart(validStart, registry);
 
     expect(result).toEqual({ ok: true, start: validStart });
+  });
+
+  it('falls back to Russian when the target language is missing', async () => {
+    const { targetLanguage: _omitted, ...withoutTarget } = validStart;
+    const result = await validateStart(withoutTarget, registry);
+
+    expect(result.ok && result.start.targetLanguage).toBe('ru');
+  });
+
+  it('rejects an unknown target language', async () => {
+    expect((await validateStart({ ...validStart, targetLanguage: 'fr' }, registry)).ok).toBe(false);
   });
 
   it('rejects a provider that is not available, in Russian', async () => {

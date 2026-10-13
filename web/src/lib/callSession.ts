@@ -79,6 +79,7 @@ export async function startCall(settings: Settings, deps: CallDeps): Promise<Cal
       url: deps.url,
       start: {
         language: settings.language,
+        targetLanguage: settings.targetLanguage,
         provider: settings.provider,
         translationModel: settings.translationModel,
         hintModel: settings.hintModel,

@@ -9,6 +9,7 @@ import type { Settings } from './settings';
 const settings: Settings = {
   audioSource: 'tab',
   language: 'de',
+  targetLanguage: 'ru',
   provider: 'gemini',
   translationModel: 'fast',
   hintModel: 'strong',
@@ -115,6 +116,7 @@ describe('starting', () => {
     expect(kit.server.url).toBe('ws://test/ws');
     expect(kit.server.start).toEqual({
       language: 'de',
+      targetLanguage: 'ru',
       provider: 'gemini',
       translationModel: 'fast',
       hintModel: 'strong',

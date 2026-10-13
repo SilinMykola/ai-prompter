@@ -1,10 +1,11 @@
-import type { ClientMessage, HintMode, ServerMessage } from '@ai-prompter/shared/protocol';
+import type { ClientMessage, HintMode, ServerMessage, TargetLanguage } from '@ai-prompter/shared/protocol';
 import type { Registry } from './llm';
 import type { LlmProvider } from './llm/types';
 import { createSentenceAssembler, type AssemblerOutput } from './sentences';
 import type { SttProvider, SttStream } from './stt/types';
 import { streamHint, type HintOptions } from './hint';
 import { HINT_CONTEXT_SENTENCES } from './prompts';
+import { isAlreadyIn } from './languageDetect';
 import { translateSentence, type TranslateOptions } from './translate';
 import { validateStart } from './validateStart';
 
@@ -61,6 +62,7 @@ export function createSession(deps: SessionDeps): Session {
   // What translation needs, known after a valid `start`.
   let llm: LlmProvider | undefined;
   let translationModel = '';
+  let targetLanguage: TargetLanguage = 'ru';
   let callContext = '';
   let profile = ''; // the user's own data: used for hints only, never for translation
   let hintModel = '';
@@ -85,6 +87,13 @@ export function createSession(deps: SessionDeps): Session {
     const sentence = history[id - 1];
     if (!llm || sentence === undefined) return;
 
+    // Already in the language the user reads: nothing to translate. An empty finished
+    // translation shows nothing on the card (and no spinner).
+    if (isAlreadyIn(targetLanguage, sentence)) {
+      send({ type: 'translation_done', id });
+      return;
+    }
+
     // A sentence has one translation at a time: a new request replaces the old one, so two never mix.
     controllers.get(id)?.abort();
     const mine = new AbortController();
@@ -97,7 +106,7 @@ export function createSession(deps: SessionDeps): Session {
         model: translationModel,
         id,
         // The user's personal data (profile) is deliberately not passed on: translation does not need it.
-        context: { callContext, previous: history.slice(Math.max(0, id - 5), id - 1), sentence },
+        context: { callContext, previous: history.slice(Math.max(0, id - 5), id - 1), sentence, targetLanguage },
         emit: send,
         signal: AbortSignal.any([cancelTranslations.signal, mine.signal]),
         restart,
@@ -221,6 +230,7 @@ export function createSession(deps: SessionDeps): Session {
       );
       llm = deps.registry.get(check.start.provider);
       translationModel = check.start.translationModel;
+      targetLanguage = check.start.targetLanguage;
       callContext = check.start.callContext;
       profile = check.start.profile;
       hintModel = check.start.hintModel;

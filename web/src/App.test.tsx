@@ -8,6 +8,9 @@ import type { CallDeps, CallHandle } from './lib/callSession';
 import type { StorageLike } from './lib/settings';
 import type { PipApi } from './hooks/usePipWindow';
 
+/** The "Язык звонка" group: other groups have radios with the same names. */
+const callLanguage = () => within(screen.getByRole('group', { name: 'Язык звонка' }));
+
 const config: ApiConfig = {
   defaultProvider: 'gemini',
   providers: [
@@ -64,7 +67,7 @@ describe('loading the configuration', () => {
   it('starts the form with remembered choices', async () => {
     setup({ stored: { 'ai-prompter.settings': JSON.stringify({ language: 'en', profile: 'Ich bin Test' }) } });
 
-    expect(await screen.findByRole('radio', { name: 'Английский' })).toBeChecked();
+    expect(await within(await screen.findByRole('group', { name: 'Язык звонка' })).findByRole('radio', { name: 'Английский' })).toBeChecked();
     expect(screen.getByLabelText('Мои данные')).toHaveValue('Ich bin Test');
     expect(screen.getByLabelText('Контекст звонка')).toHaveValue('');
   });
@@ -175,7 +178,7 @@ describe('during and after a call', () => {
 
   it('returns to the form with the earlier choices after "Начать заново"', async () => {
     const view = setup();
-    await view.user.click(await screen.findByRole('radio', { name: 'Английский' }));
+    await view.user.click(await within(await screen.findByRole('group', { name: 'Язык звонка' })).findByRole('radio', { name: 'Английский' }));
     await view.user.click(screen.getByRole('button', { name: 'Начать' }));
     await screen.findByRole('button', { name: 'Стоп' });
     act(() => view.deps.dispatch({ type: 'status', state: 'stopped' }));
@@ -183,7 +186,7 @@ describe('during and after a call', () => {
     await view.user.click(screen.getByRole('button', { name: 'Начать заново' }));
 
     expect(await screen.findByRole('button', { name: 'Начать' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Английский' })).toBeChecked();
+    expect(callLanguage().getByRole('radio', { name: 'Английский' })).toBeChecked();
   });
 
   it('stops the call when the page goes away', async () => {

@@ -1,4 +1,4 @@
-import type { Language, ProviderId, StartMessage } from '@ai-prompter/shared/protocol';
+import type { Language, ProviderId, StartMessage, TargetLanguage } from '@ai-prompter/shared/protocol';
 import type { Registry } from './llm';
 
 // Checks the first message of a session. The message comes from the browser, so it is
@@ -8,6 +8,7 @@ import type { Registry } from './llm';
 export type StartCheck = { ok: true; start: StartMessage } | { ok: false; message: string };
 
 const LANGUAGES: Language[] = ['de', 'en', 'multi'];
+const TARGET_LANGUAGES: TargetLanguage[] = ['ru', 'uk', 'de', 'en'];
 const PROVIDER_IDS: ProviderId[] = ['gemini', 'anthropic'];
 
 const fail = (message: string): StartCheck => ({ ok: false, message });
@@ -19,6 +20,11 @@ export async function validateStart(raw: unknown, registry: Pick<Registry, 'get'
   const message = raw as Record<string, unknown>;
 
   if (!LANGUAGES.includes(message.language as Language)) return fail('Неизвестный язык звонка.');
+
+  // Missing means Russian (older pages did not send it); anything else must be a known language.
+  if (message.targetLanguage !== undefined && !TARGET_LANGUAGES.includes(message.targetLanguage as TargetLanguage)) {
+    return fail('Неизвестный язык перевода.');
+  }
 
   for (const field of ['provider', 'translationModel', 'hintModel'] as const) {
     if (typeof message[field] !== 'string' || message[field] === '') return fail('Не хватает настроек сессии.');
@@ -45,6 +51,7 @@ export async function validateStart(raw: unknown, registry: Pick<Registry, 'get'
     start: {
       type: 'start',
       language: message.language as Language,
+      targetLanguage: (message.targetLanguage as TargetLanguage | undefined) ?? 'ru',
       provider: provider.id,
       translationModel: message.translationModel as string,
       hintModel: message.hintModel as string,

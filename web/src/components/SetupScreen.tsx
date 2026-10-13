@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react';
-import type { ApiConfig, Language, ProviderId } from '@ai-prompter/shared/protocol';
+import type { ApiConfig, Language, ProviderId, TargetLanguage } from '@ai-prompter/shared/protocol';
 import { changeProvider, type AudioSource, type Settings } from '../lib/settings';
 
 // The screen shown before a call. It is a "controlled" component: it does not keep the
@@ -26,6 +26,13 @@ const LANGUAGES: Array<{ value: Language; label: string }> = [
   { value: 'de', label: 'Немецкий' },
   { value: 'en', label: 'Английский' },
   { value: 'multi', label: 'Авто (DE+EN)' },
+];
+
+const TARGET_LANGUAGES: Array<{ value: TargetLanguage; label: string }> = [
+  { value: 'ru', label: 'Русский' },
+  { value: 'uk', label: 'Украинский' },
+  { value: 'de', label: 'Немецкий' },
+  { value: 'en', label: 'Английский' },
 ];
 
 export function SetupScreen({ config, settings, onChange, onStart, error, starting = false }: SetupScreenProps) {
@@ -65,6 +72,19 @@ export function SetupScreen({ config, settings, onChange, onStart, error, starti
             </label>
           ))}
         </div>
+      </fieldset>
+
+      <fieldset className="field">
+        <legend>Переводить на</legend>
+        <div className="choices">
+          {TARGET_LANGUAGES.map(({ value, label }) => (
+            <label key={value} className="choice">
+              <input type="radio" name="target-language" checked={settings.targetLanguage === value} onChange={() => update({ targetLanguage: value })} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+        <p className="field__static">Реплики уже на этом языке не переводятся.</p>
       </fieldset>
 
       <div className="field">

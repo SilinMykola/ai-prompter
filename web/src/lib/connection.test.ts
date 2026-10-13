@@ -45,6 +45,7 @@ class FakeSocket implements WebSocketLike {
 
 const startSettings: Omit<StartMessage, 'type'> = {
   language: 'de',
+  targetLanguage: 'ru',
   provider: 'gemini',
   translationModel: 'fast',
   hintModel: 'strong',

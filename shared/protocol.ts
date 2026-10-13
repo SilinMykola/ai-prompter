@@ -8,6 +8,9 @@
 /** Language of the call. `multi` = automatic German + English detection. */
 export type Language = 'de' | 'en' | 'multi';
 
+/** Language the other person's sentences are translated into. */
+export type TargetLanguage = 'ru' | 'uk' | 'de' | 'en';
+
 /** Which kind of reply hint was asked for. */
 export type HintMode = 'short' | 'detailed';
 
@@ -22,6 +25,8 @@ export type ProviderId = 'gemini' | 'anthropic';
 export interface StartMessage {
   type: 'start';
   language: Language;
+  /** Sentences are translated into this language; sentences already in it are left alone. */
+  targetLanguage: TargetLanguage;
   provider: ProviderId;
   /** Model used for translating sentences (fast one). */
   translationModel: string;
