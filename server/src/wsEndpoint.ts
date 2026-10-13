@@ -3,6 +3,7 @@ import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { ServerMessage } from '@ai-prompter/shared/protocol';
 import type { Registry } from './llm';
+import type { DevLogFactory } from './devLog';
 import { createSession } from './session';
 import type { SttProvider } from './stt/types';
 
@@ -44,6 +45,8 @@ export interface WsDeps {
   stt: SttProvider;
   registry: Pick<Registry, 'get' | 'modelsOf'>;
   log?: (event: string) => void;
+  /** Where developer-mode logs come from. Without it developer mode does nothing. */
+  openDevLog?: DevLogFactory;
 }
 
 function refuse(socket: Duplex, status: string): void {
@@ -66,6 +69,7 @@ export function attachWsEndpoint(server: Server, deps: WsDeps): void {
       stt: deps.stt,
       registry: deps.registry,
       log,
+      openDevLog: deps.openDevLog,
     });
 
     ws.on('message', (data, isBinary) => {

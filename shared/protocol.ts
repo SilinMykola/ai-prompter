@@ -34,6 +34,8 @@ export interface StartMessage {
   hintModel: string;
   /** Optional free text: who is calling and why. Sent to the LLM, never stored. */
   callContext: string;
+  /** Developer mode: the server writes a full log of this call to a file. */
+  devLog?: boolean;
   /** Optional "my data" text (name, profession...). Used for hints only, never for translation. */
   profile: string;
 }

@@ -57,6 +57,7 @@ export async function validateStart(raw: unknown, registry: Pick<Registry, 'get'
       hintModel: message.hintModel as string,
       callContext: (message.callContext as string | undefined) ?? '',
       profile: (message.profile as string | undefined) ?? '',
+      devLog: message.devLog === true,
     },
   };
 }

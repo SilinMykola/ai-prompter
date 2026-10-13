@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { ConfigError, loadConfig } from './config';
 import { createRegistry } from './llm';
 import { realFactories } from './llm/factories';
+import { fileDevLogs } from './devLog';
 import { createDeepgramProvider } from './stt/deepgram';
 import { startServer } from './server';
 
@@ -40,6 +41,6 @@ await startServer({
   port: config.port,
   staticDir: existsSync(distDir) ? distDir : undefined,
   registry,
-  ws: { stt, registry, log },
+  ws: { stt, registry, log, openDevLog: fileDevLogs(fileURLToPath(new URL('../../logs', import.meta.url))) },
 });
 console.log(`server listening on http://127.0.0.1:${config.port}`);

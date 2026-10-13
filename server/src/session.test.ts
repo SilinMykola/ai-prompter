@@ -506,6 +506,46 @@ describe('review fixes', () => {
   });
 });
 
+describe('developer log', () => {
+  const entries: Array<{ kind: string; data?: unknown }> = [];
+  const openDevLog = () => ({ path: 'logs/test.jsonl', write: (kind: string, data?: unknown) => void entries.push({ kind, data }) });
+  const kinds = () => entries.map((entry) => entry.kind);
+  beforeEach(() => void (entries.length = 0));
+
+  async function started(extra: object) {
+    const kit = setup({ openDevLog });
+    await start(kit.session, { ...validStart, ...extra });
+    return { ...kit, service: kit.stt.opened[0].handlers };
+  }
+
+  it('records recognised text, sentences and settings when the user asked for it, without the profile', async () => {
+    const { service, connection } = await started({ devLog: true });
+
+    service.onResult(final('Guten Tag.'));
+
+    expect(kinds()).toEqual(expect.arrayContaining(['session_start', 'stt_final', 'out']));
+    expect(JSON.stringify(entries)).toContain('Guten Tag.');
+    expect(JSON.stringify(entries)).not.toContain('PROFILE-TEXT');
+    expect(connection.messages).toContainEqual({ type: 'notice', message: 'Лог звонка: logs/test.jsonl' });
+  });
+
+  it('records nothing unless the start message asks for it', async () => {
+    const { service } = await started({});
+
+    service.onResult(final('Guten Tag.'));
+
+    expect(entries).toEqual([]);
+  });
+
+  it('does not record the live phrase', async () => {
+    const { service } = await started({ devLog: true });
+
+    service.onResult(interim('Guten'));
+
+    expect(entries.filter((entry) => (entry.data as { type?: string })?.type === 'interim')).toEqual([]);
+  });
+});
+
 describe('translation in the session', () => {
   const sentence = (text: string) => final(text);
 

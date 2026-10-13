@@ -16,6 +16,8 @@ export interface Settings {
   callContext: string;
   /** "My data": name, profession... Remembered in this browser only. */
   profile: string;
+  /** Developer mode: ask the server for a full log of the call. Never remembered. */
+  devLog: boolean;
 }
 
 /** The two methods of `localStorage` that we use (so tests can pass a fake one). */
@@ -68,6 +70,7 @@ export function resolveSettings(config: ApiConfig, storage: StorageLike | undefi
     hintModel: pickModel(stored.hintModel, provider.defaultHintModel),
     callContext: '',
     profile: typeof stored.profile === 'string' ? stored.profile : '',
+    devLog: false,
   };
 }
 

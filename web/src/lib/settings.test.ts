@@ -43,6 +43,7 @@ describe('default settings', () => {
       translationModel: 'g-fast',
       hintModel: 'g-strong',
       callContext: '',
+      devLog: false,
       profile: '',
     });
   });
@@ -73,6 +74,7 @@ describe('remembered settings', () => {
       translationModel: 'c-strong',
       hintModel: 'c-fast',
       callContext: '',
+      devLog: false,
       profile: 'Name: Test',
     });
   });

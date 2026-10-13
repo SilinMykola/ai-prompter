@@ -25,7 +25,7 @@ describe('validateStart', () => {
   it('accepts a valid start and returns it', async () => {
     const result = await validateStart(validStart, registry);
 
-    expect(result).toEqual({ ok: true, start: validStart });
+    expect(result).toEqual({ ok: true, start: { ...validStart, devLog: false } });
   });
 
   it('falls back to Russian when the target language is missing', async () => {

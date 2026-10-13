@@ -156,6 +156,11 @@ export function SetupScreen({ config, settings, onChange, onStart, error, starti
         />
       </div>
 
+      <label className="choice">
+        <input type="checkbox" checked={settings.devLog} onChange={(event) => update({ devLog: event.target.checked })} />
+        <span>Режим разработчика: писать полный лог звонка в файл (текст, переводы, тайминги)</span>
+      </label>
+
       {error && (
         <p className="setup__error" role="alert">
           {error}

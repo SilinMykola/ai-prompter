@@ -67,6 +67,17 @@ describe('setup screen', () => {
     expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ targetLanguage: 'de', language: 'de' }));
   });
 
+  it('has a developer-mode switch that is off by default and goes into the start settings', async () => {
+    const { onStart, user } = renderScreen(twoProviders);
+    const box = screen.getByRole('checkbox', { name: /Режим разработчика/ });
+
+    expect(box).not.toBeChecked();
+    await user.click(box);
+    await user.click(screen.getByRole('button', { name: 'Начать' }));
+
+    expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ devLog: true }));
+  });
+
   it('has the two text fields with their placeholders, empty at first', () => {
     renderScreen(twoProviders);
 

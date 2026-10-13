@@ -5,6 +5,7 @@ import { createSentenceAssembler, type AssemblerOutput } from './sentences';
 import type { SttProvider, SttStream } from './stt/types';
 import { streamHint, type HintOptions } from './hint';
 import { HINT_CONTEXT_SENTENCES } from './prompts';
+import type { DevLog, DevLogFactory } from './devLog';
 import { isAlreadyIn } from './languageDetect';
 import { translateSentence, type TranslateOptions } from './translate';
 import { validateStart } from './validateStart';
@@ -25,6 +26,8 @@ export interface SessionDeps {
   stt: SttProvider;
   registry: Pick<Registry, 'get' | 'modelsOf'>;
   log?(event: string): void;
+  /** Opens the developer log of this call, when the user asked for one. */
+  openDevLog?: DevLogFactory;
   /** How long to wait for the first message. */
   startTimeoutMs?: number;
   /** Translates one sentence. Replaceable in tests. */
@@ -52,7 +55,13 @@ const DEFAULT_START_TIMEOUT_MS = 10_000;
 const STOP_GRACE_MS = 5000;
 
 export function createSession(deps: SessionDeps): Session {
-  const log = deps.log ?? (() => {});
+  const baseLog = deps.log ?? (() => {});
+  // Developer mode (opt-in per call): a full record of the call in a file. Off unless `start` asks.
+  let dev: DevLog | undefined;
+  const log = (event: string) => {
+    baseLog(event);
+    dev?.write('event', event);
+  };
   let state: State = 'waiting';
   let stream: SttStream | undefined;
   const assembler = createSentenceAssembler();
@@ -174,7 +183,10 @@ export function createSession(deps: SessionDeps): Session {
   }
 
   function send(message: ServerMessage): void {
-    if (state !== 'done') deps.send(message);
+    if (state !== 'done') {
+      if (message.type !== 'interim') dev?.write('out', message); // the live phrase changes many times a second
+      deps.send(message);
+    }
   }
 
   // Closes the recognition stream without ever throwing or leaving a rejected promise behind:
@@ -228,6 +240,15 @@ export function createSession(deps: SessionDeps): Session {
       log(
         `session_start provider=${check.start.provider} translation=${check.start.translationModel} hint=${check.start.hintModel}`,
       );
+      if (check.start.devLog) {
+        dev = deps.openDevLog?.();
+        if (dev) {
+          // "My data" (profile) is left out: it is personal and the log is about the translation.
+          const { profile: _profile, ...settings } = check.start;
+          dev.write('session_start', settings);
+          send({ type: 'notice', message: `Лог звонка: ${dev.path}` });
+        }
+      }
       llm = deps.registry.get(check.start.provider);
       translationModel = check.start.translationModel;
       targetLanguage = check.start.targetLanguage;
@@ -239,8 +260,12 @@ export function createSession(deps: SessionDeps): Session {
         { language: check.start.language },
         {
           onOpen: () => send({ type: 'status', state: 'listening' }),
-          onResult: (result) => relay(assembler.pushResult(result)),
+          onResult(result) {
+            if (result.isFinal) dev?.write('stt_final', result);
+            relay(assembler.pushResult(result));
+          },
           onUtteranceEnd() {
+            dev?.write('stt_utterance_end');
             relay(assembler.pushUtteranceEnd());
             send({ type: 'status', state: 'listening' });
           },
@@ -330,11 +355,13 @@ export function createSession(deps: SessionDeps): Session {
         send({ type: 'error', message: 'Сессия уже начата.' });
         return;
       case 'retranslate': {
+        dev?.write('in', message);
         const id = (message as { id?: unknown }).id;
         if (typeof id === 'number' && Number.isInteger(id)) startTranslation(id, true); // unknown ids are ignored there
         return;
       }
       case 'hint': {
+        dev?.write('in', message);
         const { id, mode } = message as { id?: unknown; mode?: unknown };
         // Anything unexpected (unknown sentence, odd mode) is ignored: the browser only sends valid requests.
         if (typeof id === 'number' && Number.isInteger(id) && (mode === 'short' || mode === 'detailed'))

@@ -15,6 +15,7 @@ const settings: Settings = {
   hintModel: 'strong',
   callContext: 'Arzttermin',
   profile: 'Name: Test',
+  devLog: false,
 };
 
 // Fakes for the two things the orchestrator connects.
@@ -122,6 +123,7 @@ describe('starting', () => {
       hintModel: 'strong',
       callContext: 'Arzttermin',
       profile: 'Name: Test',
+      devLog: false,
     });
     expect(kit.actions).toEqual([{ type: 'reset' }, { type: 'status', state: 'connecting' }]);
   });

@@ -85,6 +85,7 @@ export async function startCall(settings: Settings, deps: CallDeps): Promise<Cal
         hintModel: settings.hintModel,
         callContext: settings.callContext,
         profile: settings.profile,
+        devLog: settings.devLog,
       },
       onMessage(message) {
         if (message.type === 'restart_recorder') {

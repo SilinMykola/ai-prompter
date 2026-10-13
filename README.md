@@ -72,6 +72,8 @@ One WebSocket connection is one call. The first message must be a valid `start`;
 
 Only pages from your own machine may connect: the server refuses a WebSocket whose `Host` is not `localhost` / `127.0.0.1` / `[::1]` or whose `Origin` differs from `Host`. Without this, any web page open in your browser could use your API keys through `ws://127.0.0.1:8787/ws`.
 
+**Developer mode.** The checkbox "Режим разработчика" on the setup screen makes the server write a full record of that call to `logs/<time>.jsonl` (git-ignored): recognised text, sentences, every translation and hint message with its time, errors, and the settings of the call (but not "Мои данные"). It is off by default, is not remembered, and the file name is shown in a note when the call starts. This is the only place where call text is written to disk.
+
 The server log contains event names, provider and model names, and error codes, but never text from a call.
 
 ## Speech recognition
