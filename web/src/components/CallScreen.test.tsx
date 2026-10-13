@@ -7,6 +7,7 @@ import { CallScreen } from './CallScreen';
 
 const card = (id: number, change: Partial<Card> = {}): Card => ({
   id,
+  paragraph: id, // every card is a paragraph of its own unless a test says otherwise
   text: `Satz ${id}.`,
   translation: { text: `Предложение ${id}.`, state: 'done' },
   hint: null,
@@ -107,6 +108,21 @@ describe('feed', () => {
 
     const originals = screen.getAllByText(/^Satz \d\.$/).map((el) => el.textContent);
     expect(originals).toEqual(['Satz 1.', 'Satz 2.', 'Satz 3.']);
+  });
+
+  it('shows sentences of one paragraph together, with one pair of hint buttons per paragraph', () => {
+    setup({ cards: [card(1, { paragraph: 1 }), card(2, { paragraph: 1 }), card(3, { paragraph: 2 })] });
+
+    expect(screen.getAllByRole('article')).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Коротко' })).toHaveLength(2);
+  });
+
+  it('asks for a hint on the last sentence of the paragraph', async () => {
+    const { user, onHint } = setup({ cards: [card(1, { paragraph: 1 }), card(2, { paragraph: 1 })] });
+
+    await user.click(screen.getByRole('button', { name: 'Коротко' }));
+
+    expect(onHint).toHaveBeenCalledWith(2, 'short');
   });
 
   it('shows the live phrase after the cards', () => {

@@ -2,13 +2,13 @@ import { useRef } from 'react';
 import type { HintMode, ProviderId } from '@ai-prompter/shared/protocol';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useHotkeys } from '../hooks/useHotkeys';
-import { latestCard, type CallState } from '../lib/callReducer';
+import { groupParagraphs, latestCard, type CallState } from '../lib/callReducer';
 import type { Settings } from '../lib/settings';
 import { LivePhrase } from './LivePhrase';
-import { SentenceCard } from './SentenceCard';
+import { ParagraphCard } from './ParagraphCard';
 
 // The screen during a call: a header with the state of the call, a scrolling feed of
-// sentence cards, and the phrase being spoken right now at the bottom.
+// paragraphs, and the phrase being spoken right now at the bottom.
 
 interface CallScreenProps {
   state: CallState;
@@ -116,14 +116,14 @@ export function CallScreen({
 
       <div className="feed" ref={feedRef}>
         {showInvitation && <p className="feed__empty">Жду речь собеседника…</p>}
-        {state.cards.map((card) => (
-          <SentenceCard
-            key={card.id}
-            card={card}
-            isLatest={card.id === latest?.id}
+        {groupParagraphs(state.cards).map((cards) => (
+          <ParagraphCard
+            key={cards[0].id}
+            cards={cards}
+            isLatest={cards.some((card) => card.id === latest?.id)}
             disabled={stopped}
-            onHint={(mode) => onHint(card.id, mode)}
-            onRetranslate={() => onRetranslate(card.id)}
+            onHint={(mode) => onHint(cards[cards.length - 1].id, mode)}
+            onRetranslate={onRetranslate}
           />
         ))}
         <LivePhrase

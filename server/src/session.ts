@@ -6,6 +6,7 @@ import type { SttProvider, SttStream } from './stt/types';
 import { streamHint, type HintOptions } from './hint';
 import { HINT_CONTEXT_SENTENCES } from './prompts';
 import type { DevLog, DevLogFactory } from './devLog';
+import { createParagrapher } from './paragraphs';
 import { isAlreadyIn } from './languageDetect';
 import { translateSentence, type TranslateOptions } from './translate';
 import { validateStart } from './validateStart';
@@ -65,6 +66,7 @@ export function createSession(deps: SessionDeps): Session {
   let state: State = 'waiting';
   let stream: SttStream | undefined;
   const assembler = createSentenceAssembler();
+  const paragrapher = createParagrapher();
   const translate = deps.translate ?? translateSentence;
   const hint = deps.hint ?? streamHint;
 
@@ -176,7 +178,7 @@ export function createSession(deps: SessionDeps): Session {
   function relay(output: AssemblerOutput): void {
     for (const sentence of output.sentences) {
       history[sentence.id - 1] = sentence.text;
-      send({ type: 'sentence', id: sentence.id, text: sentence.text });
+      send({ type: 'sentence', id: sentence.id, text: sentence.text, paragraph: paragrapher.next(sentence.text) });
       startTranslation(sentence.id);
     }
     send({ type: 'interim', finalText: output.finalText, interimText: output.interimText });

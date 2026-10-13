@@ -128,7 +128,7 @@ describe('/ws endpoint', () => {
 
     stt.opened[0].handlers.onResult({ transcript: 'Guten Tag.', isFinal: true, speechFinal: false });
     await waitFor(() => messages.some((m) => m.type === 'sentence'));
-    expect(messages.find((m) => m.type === 'sentence')).toEqual({ type: 'sentence', id: 1, text: 'Guten Tag.' });
+    expect(messages.find((m) => m.type === 'sentence')).toEqual({ type: 'sentence', id: 1, text: 'Guten Tag.', paragraph: 1 });
 
     const closed = new Promise<void>((resolve) => socket.on('close', () => resolve()));
     socket.send(JSON.stringify({ type: 'stop' }));

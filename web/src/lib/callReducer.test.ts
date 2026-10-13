@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ServerMessage } from '@ai-prompter/shared/protocol';
-import { callReducer, initialCallState, latestCard, type CallAction, type CallState } from './callReducer';
+import { callReducer, groupParagraphs, initialCallState, latestCard, type CallAction, type CallState } from './callReducer';
 
 // Applies a list of actions to the state, one after another (what React's useReducer does over time).
 const run = (actions: CallAction[], from: CallState = initialCallState): CallState => actions.reduce(callReducer, from);
@@ -32,10 +32,24 @@ describe('sentence cards', () => {
     expect(state.cards.map((c) => c.id)).toEqual([1, 2]);
     expect(card(state, 1)).toEqual({
       id: 1,
+      paragraph: 1, // the sentence message had none: the card is a paragraph of its own
       text: 'Guten Tag.',
       translation: { text: '', state: 'waiting' },
       hint: null,
     });
+  });
+
+  it('keeps the paragraph number the server gave, and groups neighbours with the same number', () => {
+    const withParagraph = (id: number, paragraph: number): ServerMessage => ({ type: 'sentence', id, text: `S${id}`, paragraph });
+    const state = run([withParagraph(1, 1), withParagraph(2, 1), withParagraph(3, 2)]);
+
+    expect(groupParagraphs(state.cards).map((group) => group.map((c) => c.id))).toEqual([[1, 2], [3]]);
+  });
+
+  it('puts sentences without a paragraph number into paragraphs of their own', () => {
+    const state = run([sentence(1), sentence(2)]);
+
+    expect(groupParagraphs(state.cards).map((group) => group.length)).toEqual([1, 1]);
   });
 
   it('ignores a sentence whose id already has a card', () => {

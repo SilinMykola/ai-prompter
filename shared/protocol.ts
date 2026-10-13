@@ -88,6 +88,8 @@ export interface SentenceMessage {
   id: number;
   text: string;
   language?: string;
+  /** Sentences with the same number are shown together as one paragraph. */
+  paragraph?: number;
 }
 
 /**

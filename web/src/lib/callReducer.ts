@@ -14,6 +14,8 @@ export type HintState = 'streaming' | 'done' | 'error';
 /** One sentence of the other person, with its translation and (optional) reply hint. */
 export interface Card {
   id: number;
+  /** The paragraph this sentence is shown in. A message without one makes a paragraph of its own. */
+  paragraph: number;
   text: string;
   translation: { text: string; state: TranslationState };
   hint: null | { mode: HintMode; text: string; state: HintState };
@@ -45,6 +47,17 @@ export const initialCallState: CallState = {
   cards: [],
   error: null,
 };
+
+/** Cards that belong to one paragraph, next to each other, in the order they were said. */
+export function groupParagraphs(cards: Card[]): Card[][] {
+  const groups: Card[][] = [];
+  for (const card of cards) {
+    const last = groups.at(-1);
+    if (last && last[0].paragraph === card.paragraph) last.push(card);
+    else groups.push([card]);
+  }
+  return groups;
+}
 
 /** The newest card: the target of the keyboard shortcuts. */
 export function latestCard(state: CallState): Card | undefined {
@@ -85,6 +98,7 @@ export function callReducer(state: CallState, action: CallAction): CallState {
           ...state.cards,
           {
             id: action.id,
+            paragraph: action.paragraph ?? action.id,
             text: action.text,
             translation: { text: '', state: 'waiting' },
             hint: null,

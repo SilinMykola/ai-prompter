@@ -206,7 +206,7 @@ describe('live text and sentences', () => {
     service.onResult(final('Guten Tag. Wie geht'));
 
     expect(connection.messages).toEqual([
-      { type: 'sentence', id: 1, text: 'Guten Tag.' },
+      { type: 'sentence', id: 1, text: 'Guten Tag.', paragraph: 1 },
       { type: 'interim', finalText: 'Wie geht', interimText: '' },
     ]);
   });
@@ -237,7 +237,7 @@ describe('live text and sentences', () => {
     service.onUtteranceEnd();
 
     expect(connection.messages).toEqual([
-      { type: 'sentence', id: 1, text: 'Ich komme gleich' },
+      { type: 'sentence', id: 1, text: 'Ich komme gleich', paragraph: 1 },
       { type: 'interim', finalText: '', interimText: '' },
       { type: 'status', state: 'listening' },
     ]);
@@ -248,7 +248,7 @@ describe('live text and sentences', () => {
 
     service.onResult(final('Danke schön', true));
 
-    expect(connection.messages[0]).toEqual({ type: 'sentence', id: 1, text: 'Danke schön' });
+    expect(connection.messages[0]).toEqual({ type: 'sentence', id: 1, text: 'Danke schön', paragraph: 1 });
   });
 });
 
@@ -260,7 +260,7 @@ describe('ending a session', () => {
     await session.onText(JSON.stringify({ type: 'stop' }));
 
     expect(connection.messages).toEqual([
-      { type: 'sentence', id: 1, text: 'Letzte Worte.' },
+      { type: 'sentence', id: 1, text: 'Letzte Worte.', paragraph: 1 },
       { type: 'interim', finalText: '', interimText: '' },
       { type: 'interim', finalText: '', interimText: '' },
       { type: 'status', state: 'stopped' },
@@ -276,7 +276,7 @@ describe('ending a session', () => {
 
     await session.onText(JSON.stringify({ type: 'stop' }));
 
-    expect(connection.messages[0]).toEqual({ type: 'sentence', id: 1, text: 'Und dann' });
+    expect(connection.messages[0]).toEqual({ type: 'sentence', id: 1, text: 'Und dann', paragraph: 1 });
     expect(connection.messages.at(-1)).toEqual({ type: 'status', state: 'stopped' });
   });
 
@@ -543,6 +543,29 @@ describe('developer log', () => {
     service.onResult(interim('Guten'));
 
     expect(entries.filter((entry) => (entry.data as { type?: string })?.type === 'interim')).toEqual([]);
+  });
+});
+
+describe('paragraphs in the session', () => {
+  const paragraphOf = (connection: ReturnType<typeof setup>['connection']) =>
+    connection.messages.filter((m) => m.type === 'sentence').map((m) => (m as { paragraph?: number }).paragraph);
+
+  it('numbers the paragraph of every sentence: five quick ones together, then the next paragraph', async () => {
+    const { service, connection } = await running();
+
+    service.onResult(final('Eins. Zwei. Drei. Vier. Fünf. Sechs.'));
+
+    expect(paragraphOf(connection)).toEqual([1, 1, 1, 1, 1, 2]);
+  });
+
+  it('starts a new paragraph after a long silence', async () => {
+    const { service, connection } = await running();
+
+    service.onResult(final('Eins.'));
+    vi.advanceTimersByTime(4000);
+    service.onResult(final('Zwei.'));
+
+    expect(paragraphOf(connection)).toEqual([1, 2]);
   });
 });
 
