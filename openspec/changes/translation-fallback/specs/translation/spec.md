@@ -10,8 +10,8 @@ After a rate-limit error, when the call has a fallback translation model, the sy
 - **THEN** a notice is sent, the retry starts after two seconds, and it may succeed
 
 #### Scenario: Rate limited with a fallback model
-- **WHEN** the first attempt with `gemini-flash-lite-latest` fails with a rate-limit error and the fallback model is `gemini-3.5-flash-lite`
-- **THEN** a notice naming both models is sent, the retry asks `gemini-3.5-flash-lite` without waiting, and it may succeed
+- **WHEN** the first attempt with `gemini-flash-lite-latest` fails with a rate-limit error and the fallback model is `gemini-3.1-flash-lite`
+- **THEN** a notice naming both models is sent, the retry asks `gemini-3.1-flash-lite` without waiting, and it may succeed
 
 #### Scenario: Other errors keep the model
 - **WHEN** the first attempt fails with an error that is not a rate limit and there is a fallback model

@@ -698,6 +698,18 @@ describe('translation in the session', () => {
     expect(kit.translate.mock.calls[0][0]).toMatchObject({ model: 'fast', fallbackModel: 'spare-flash-lite' });
   });
 
+  it('gives a re-translation the fallback model too', async () => {
+    const registry = { ...fakeRegistry, modelsOf: async () => ['fast', 'strong', 'spare-flash-lite'] };
+    const kit = setup({ registry });
+    await start(kit.session);
+    kit.stt.opened[0].handlers.onResult(sentence('Guten Tag.'));
+    kit.translate.mockClear();
+
+    await kit.session.onText(JSON.stringify({ type: 'retranslate', id: 1 }));
+
+    expect(kit.translate.mock.calls[0][0]).toMatchObject({ restart: true, fallbackModel: 'spare-flash-lite' });
+  });
+
   it('gives no fallback model when the provider has no other fast model', async () => {
     const { service, translate } = await running();
 

@@ -107,11 +107,18 @@ export function pickDefaults(ids: string[]): DefaultModels {
 /**
  * A second fast model for translation, used when the chosen one hits its request limit (limits are
  * counted per model): the newest other lite model, else the newest other plain flash model, else none.
+ *
+ * A chosen alias without a version ("gemini-flash-lite-latest") points to the newest model of its kind
+ * and shares its limit. Measured on 2026-11-25: after a 429 on the alias, gemini-3.5-flash-lite answered
+ * 429 too and gemini-3.1-flash-lite answered. So for an alias the newest model of its kind is skipped.
  */
 export function pickFallbackTranslation(ids: string[], chosen: string): string | undefined {
-  const others = ids.filter((id) => id !== chosen);
   for (const pattern of [/flash-lite|haiku/, /flash(?!-lite)/]) {
-    const matching = others.filter((id) => pattern.test(id));
+    let matching = ids.filter((id) => pattern.test(id) && id !== chosen);
+    if (versionOf(chosen).length === 0 && pattern.test(chosen) && matching.length > 0) {
+      const aliasTarget = newest(matching);
+      matching = matching.filter((id) => id !== aliasTarget);
+    }
     if (matching.length > 0) return newest(matching);
   }
   return undefined;

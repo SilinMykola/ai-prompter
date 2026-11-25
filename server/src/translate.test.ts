@@ -170,16 +170,17 @@ describe('rate limits', () => {
 
   it('retries at once with the fallback model and names both models', async () => {
     const { done, messages, sleeps, requests } = run([{ error: llmError('rate_limit') }, { pieces: ['Да.'] }], {
-      fallbackModel: 'other-model',
+      model: 'gemini-flash-lite-latest',
+      fallbackModel: 'gemini-3.1-flash-lite',
     });
     await done;
 
     expect(sleeps).toEqual([]);
-    expect(requests.map((r) => r.model)).toEqual(['fast-model', 'other-model']);
+    expect(requests.map((r) => r.model)).toEqual(['gemini-flash-lite-latest', 'gemini-3.1-flash-lite']);
     expect(types(messages)).toEqual(['notice', 'translation_start', 'translation_delta', 'translation_done']);
     expect(messages[0]).toMatchObject({
       type: 'notice',
-      message: expect.stringMatching(/лимит.*fast-model.*other-model/i),
+      message: expect.stringMatching(/лимит.*gemini-flash-lite-latest.*gemini-3\.1-flash-lite/i),
     });
   });
 

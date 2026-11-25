@@ -67,9 +67,15 @@ describe('filterClaudeModels', () => {
 
 describe('pickFallbackTranslation', () => {
   it('picks the newest other lite model', () => {
+    expect(pickFallbackTranslation(['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.8-flash-lite'], 'gemini-3.8-flash-lite')).toBe(
+      'gemini-3.5-flash-lite',
+    );
+  });
+
+  it('skips the newest lite model when the chosen one is an alias without a version, which shares its limit', () => {
     expect(
       pickFallbackTranslation(['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.5-flash'], 'gemini-flash-lite-latest'),
-    ).toBe('gemini-3.5-flash-lite');
+    ).toBe('gemini-3.1-flash-lite');
   });
 
   it('falls back to a plain flash model', () => {
