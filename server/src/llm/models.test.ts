@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterClaudeModels, filterGeminiModels, pickDefaults } from './models';
+import { filterClaudeModels, filterGeminiModels, pickDefaults, pickFallbackTranslation } from './models';
 
 // A trimmed copy of what the real Gemini models.list returned: chat models mixed with
 // text-to-speech, image, music, agent, research and robotics models.
@@ -62,6 +62,28 @@ describe('filterClaudeModels', () => {
       'claude-sonnet-5-5',
       'claude-haiku-5-5',
     ]);
+  });
+});
+
+describe('pickFallbackTranslation', () => {
+  it('picks the newest other lite model', () => {
+    expect(pickFallbackTranslation(['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.8-flash-lite'], 'gemini-3.8-flash-lite')).toBe(
+      'gemini-3.5-flash-lite',
+    );
+  });
+
+  it('skips the newest lite model when the chosen one is an alias without a version, which shares its limit', () => {
+    expect(
+      pickFallbackTranslation(['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.5-flash'], 'gemini-flash-lite-latest'),
+    ).toBe('gemini-3.1-flash-lite');
+  });
+
+  it('falls back to a plain flash model', () => {
+    expect(pickFallbackTranslation(['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.1-pro'], 'gemini-3.5-flash-lite')).toBe('gemini-3.5-flash');
+  });
+
+  it('has none when no other fast model is offered', () => {
+    expect(pickFallbackTranslation(['gemini-3.5-flash-lite', 'gemini-3.1-pro'], 'gemini-3.5-flash-lite')).toBeUndefined();
   });
 });
 

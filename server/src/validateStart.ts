@@ -5,7 +5,8 @@ import type { Registry } from './llm';
 // treated as untrusted: the shape is checked at runtime, not just by TypeScript types.
 // Error messages are in Russian because they are shown to the user.
 
-export type StartCheck = { ok: true; start: StartMessage } | { ok: false; message: string };
+/** On success also the provider's models, which the check had to fetch anyway. */
+export type StartCheck = { ok: true; start: StartMessage; models: string[] } | { ok: false; message: string };
 
 const LANGUAGES: Language[] = ['de', 'en', 'multi'];
 const TARGET_LANGUAGES: TargetLanguage[] = ['ru', 'uk', 'de', 'en'];
@@ -48,6 +49,7 @@ export async function validateStart(raw: unknown, registry: Pick<Registry, 'get'
 
   return {
     ok: true,
+    models,
     start: {
       type: 'start',
       language: message.language as Language,

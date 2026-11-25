@@ -13,6 +13,8 @@ const MAX_TOKENS = 300;
 export interface TranslateOptions {
   provider: Pick<LlmProvider, 'stream'>;
   model: string;
+  /** Another fast model that takes the retry when `model` hits its request limit. */
+  fallbackModel?: string;
   /** The sentence's id: every message sent carries it. */
   id: number;
   context: TranslationContext;
@@ -33,13 +35,13 @@ export interface TranslateOptions {
 const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export async function translateSentence(options: TranslateOptions): Promise<void> {
-  const { provider, model, id, context, emit, signal } = options;
+  const { provider, id, context, emit, signal } = options;
   const sleep = options.sleep ?? realSleep;
   const log = options.log ?? (() => {});
   const prompt = buildTranslationPrompt(context);
 
   // One try. Resolves when the whole translation was streamed; throws if it went wrong.
-  async function attempt(): Promise<void> {
+  async function attempt(model: string): Promise<void> {
     // This try may be cut short by the 10-second timer or by the session ending.
     const timeout = new AbortController();
     let timedOut = false;
@@ -77,9 +79,10 @@ export async function translateSentence(options: TranslateOptions): Promise<void
   if (signal?.aborted) return;
   if (options.restart) emit({ type: 'translation_start', id });
 
+  let model = options.model;
   for (let tries = 1; tries <= 2; tries++) {
     try {
-      await attempt();
+      await attempt(model);
       if (!signal?.aborted) emit({ type: 'translation_done', id });
       return;
     } catch (error) {
@@ -93,7 +96,11 @@ export async function translateSentence(options: TranslateOptions): Promise<void
       }
       if (tries === 2) break;
 
-      if (failure.kind === 'rate_limit') {
+      if (failure.kind === 'rate_limit' && options.fallbackModel) {
+        // Limits are counted per model, so another model can answer at once.
+        emit({ type: 'notice', message: `Лимит запросов у модели ${model}. Перевожу моделью ${options.fallbackModel}.` });
+        model = options.fallbackModel;
+      } else if (failure.kind === 'rate_limit') {
         emit({ type: 'notice', message: 'Лимит запросов провайдера. Повторяю через 2 секунды…' });
         await sleep(RATE_LIMIT_WAIT_MS);
         if (signal?.aborted) return;
