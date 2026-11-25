@@ -17,7 +17,7 @@ On opening, the app SHALL load the server's configuration and show the setup for
 - **THEN** the screen says the server did not answer and shows a retry button
 
 ### Requirement: Choices on the form
-The form SHALL offer: audio source (Chrome tab, default; entire screen or app such as Zoom, labelled "Весь экран / приложение (Zoom)"; or microphone); call language (German, default, English, or automatic German and English); provider; translation model; hint model; a free-text call context with the placeholder "Кто звонит, куда, зачем. Например: запись к терапевту; техническое интервью на Magento-разработчика"; a free-text "my data" field with the placeholder "Имя, дата рождения, страховая, профессия и стек — то, о чём могут спросить"; and a start button.
+The form SHALL offer: audio source (see "Audio sources"); call language (German, default, English, or automatic German and English); provider; translation model; hint model; a free-text call context with the placeholder "Кто звонит, куда, зачем. Например: запись к терапевту; техническое интервью на Magento-разработчика"; a free-text "my data" field with the placeholder "Имя, дата рождения, страховая, профессия и стек — то, о чём могут спросить"; and a start button.
 
 #### Scenario: Defaults
 - **WHEN** nothing was remembered and the server's default provider is Gemini
@@ -26,6 +26,10 @@ The form SHALL offer: audio source (Chrome tab, default; entire screen or app su
 #### Scenario: Placeholders
 - **WHEN** the form is shown
 - **THEN** the two text fields show the texts above as placeholders
+
+
+### Requirement: Audio sources
+The audio source choice SHALL offer a Chrome tab (the default), the entire screen or an app such as Zoom (labelled "Весь экран / приложение (Zoom)"), and the microphone.
 
 #### Scenario: Entire screen remembered
 - **WHEN** the user picks "Весь экран / приложение (Zoom)", starts a call and comes back
