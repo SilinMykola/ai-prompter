@@ -688,6 +688,24 @@ describe('translation in the session', () => {
     });
   });
 
+  it('gives translation a fallback model chosen from the provider\'s other fast models', async () => {
+    const registry = { ...fakeRegistry, modelsOf: async () => ['fast', 'strong', 'spare-flash-lite'] };
+    const kit = setup({ registry });
+    await start(kit.session);
+
+    kit.stt.opened[0].handlers.onResult(sentence('Guten Tag.'));
+
+    expect(kit.translate.mock.calls[0][0]).toMatchObject({ model: 'fast', fallbackModel: 'spare-flash-lite' });
+  });
+
+  it('gives no fallback model when the provider has no other fast model', async () => {
+    const { service, translate } = await running();
+
+    service.onResult(sentence('Guten Tag.'));
+
+    expect(translate.mock.calls[0][0].fallbackModel).toBeUndefined();
+  });
+
   it('does not translate a sentence that is already in the target language', async () => {
     const { service, translate, connection } = await running();
 

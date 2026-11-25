@@ -10,6 +10,7 @@ import { createParagrapher } from './paragraphs';
 import { isAlreadyIn } from './languageDetect';
 import { translateSentence, type TranslateOptions } from './translate';
 import { validateStart } from './validateStart';
+import { pickFallbackTranslation } from './llm/models';
 
 // One call session: lives as long as one browser WebSocket connection.
 //
@@ -78,6 +79,7 @@ export function createSession(deps: SessionDeps): Session {
   // What translation needs, known after a valid `start`.
   let llm: LlmProvider | undefined;
   let translationModel = '';
+  let fallbackModel: string | undefined; // takes a retry when the translation model hits its request limit
   let targetLanguage: TargetLanguage = 'ru';
   let callContext = '';
   let profile = ''; // the user's own data: used for hints only, never for translation
@@ -122,6 +124,7 @@ export function createSession(deps: SessionDeps): Session {
       job = translate({
         provider: llm,
         model: translationModel,
+        fallbackModel,
         id,
         // The user's personal data (profile) is deliberately not passed on: translation does not need it.
         context: { callContext, previous: history.slice(Math.max(0, id - 5), id - 1), sentence, targetLanguage },
@@ -277,6 +280,7 @@ export function createSession(deps: SessionDeps): Session {
       }
       llm = deps.registry.get(check.start.provider);
       translationModel = check.start.translationModel;
+      fallbackModel = pickFallbackTranslation(check.models, translationModel);
       targetLanguage = check.start.targetLanguage;
       callContext = check.start.callContext;
       profile = check.start.profile;

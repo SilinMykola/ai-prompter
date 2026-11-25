@@ -36,7 +36,7 @@ The server listens on `127.0.0.1` only. API keys stay on the server.
 
 ## Translation
 
-Every finished sentence is translated at once, in parallel, by the translation model you chose, and streamed into its card (about one second to the first words with the default fast Gemini model). A failed or timed-out (10 s) translation is retried once; after a provider rate limit the app says so in a short note, waits 2 seconds and retries. A card that still fails shows "перевод не получен" with a "повторить" button.
+Every finished sentence is translated at once, in parallel, by the translation model you chose, and streamed into its card (a median of 2.3 s to the first words with the default fast Gemini model in a live call). A failed or timed-out (10 s) translation is retried once; after a rate limit (HTTP 429) the retry goes at once to a second fast model of the same provider, chosen when the call starts (the newest other "flash-lite" / "haiku", else the newest other plain "flash"), because limits are counted per model; a short note names both models. Without such a model the app says so in a short note, waits 2 seconds and retries. A card that still fails shows "перевод не получен" with a "повторить" button.
 
 The target language is chosen on the setup screen ("Переводить на": Russian by default, also Ukrainian, German, English) and sent in `start` as `targetLanguage`. A sentence that is clearly already in that language is not translated and its card shows no translation (the server guesses the language by alphabet and common words, in `server/src/languageDetect.ts`; when unsure, it translates). Reply hints still answer with a Russian translation whatever the target is. Translating both ways in one call is not supported yet.
 

@@ -103,3 +103,16 @@ export function pickDefaults(ids: string[]): DefaultModels {
 
   return { translation, hint };
 }
+
+/**
+ * A second fast model for translation, used when the chosen one hits its request limit (limits are
+ * counted per model): the newest other lite model, else the newest other plain flash model, else none.
+ */
+export function pickFallbackTranslation(ids: string[], chosen: string): string | undefined {
+  const others = ids.filter((id) => id !== chosen);
+  for (const pattern of [/flash-lite|haiku/, /flash(?!-lite)/]) {
+    const matching = others.filter((id) => pattern.test(id));
+    if (matching.length > 0) return newest(matching);
+  }
+  return undefined;
+}

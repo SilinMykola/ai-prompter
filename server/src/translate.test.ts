@@ -167,6 +167,28 @@ describe('rate limits', () => {
 
     expect(messages.at(-1)).toEqual({ type: 'translation_error', id: 7 });
   });
+
+  it('retries at once with the fallback model and names both models', async () => {
+    const { done, messages, sleeps, requests } = run([{ error: llmError('rate_limit') }, { pieces: ['Да.'] }], {
+      fallbackModel: 'other-model',
+    });
+    await done;
+
+    expect(sleeps).toEqual([]);
+    expect(requests.map((r) => r.model)).toEqual(['fast-model', 'other-model']);
+    expect(types(messages)).toEqual(['notice', 'translation_start', 'translation_delta', 'translation_done']);
+    expect(messages[0]).toMatchObject({
+      type: 'notice',
+      message: expect.stringMatching(/лимит.*fast-model.*other-model/i),
+    });
+  });
+
+  it('keeps the chosen model for a retry after other errors', async () => {
+    const { done, requests } = run([{ error: llmError('other') }, { pieces: ['Да.'] }], { fallbackModel: 'other-model' });
+    await done;
+
+    expect(requests.map((r) => r.model)).toEqual(['fast-model', 'fast-model']);
+  });
 });
 
 describe('a rejected key', () => {

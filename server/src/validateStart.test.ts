@@ -22,10 +22,10 @@ const validStart = {
 };
 
 describe('validateStart', () => {
-  it('accepts a valid start and returns it', async () => {
+  it('accepts a valid start and returns it with the provider\'s models', async () => {
     const result = await validateStart(validStart, registry);
 
-    expect(result).toEqual({ ok: true, start: { ...validStart, devLog: false } });
+    expect(result).toEqual({ ok: true, start: { ...validStart, devLog: false }, models: ['fast', 'strong'] });
   });
 
   it('falls back to Russian when the target language is missing', async () => {
