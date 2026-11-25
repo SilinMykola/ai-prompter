@@ -335,3 +335,42 @@ describe('day numbers (German ordinal dates)', () => {
     expect(out.sentences.map((s) => s.text)).toEqual(['Ich habe 123.', 'Dann gehe ich.']);
   });
 });
+
+describe('speakers', () => {
+  const said = (transcript: string, speaker?: number): SttResult => ({ transcript, isFinal: true, speechFinal: false, speaker });
+
+  it('ends an unfinished sentence when another speaker starts', () => {
+    const assembler = createSentenceAssembler();
+    expect(assembler.pushResult(said('Haben Sie Fragen', 0)).sentences).toEqual([]);
+
+    const out = assembler.pushResult(said('Ja, eine.', 1));
+
+    expect(out.sentences.map(({ text, speaker }) => ({ text, speaker }))).toEqual([
+      { text: 'Haben Sie Fragen', speaker: 0 },
+      { text: 'Ja, eine.', speaker: 1 },
+    ]);
+  });
+
+  it('joins the words of the same speaker', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(said('Ich möchte einen', 0));
+
+    const out = assembler.pushResult(said('Termin.', 0));
+
+    expect(out.sentences).toEqual([{ id: 1, text: 'Ich möchte einen Termin.', speaker: 0 }]);
+  });
+
+  it('keeps the speaker of a flushed tail', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(said('Ich komme gleich', 1));
+
+    expect(assembler.flush().sentences).toEqual([{ id: 1, text: 'Ich komme gleich', speaker: 1 }]);
+  });
+
+  it('works as before without speakers', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(said('Ich möchte einen'));
+
+    expect(assembler.pushResult(said('Termin.')).sentences).toEqual([{ id: 1, text: 'Ich möchte einen Termin.' }]);
+  });
+});

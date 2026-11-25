@@ -17,11 +17,15 @@ export interface SttResult {
    * sentence: Deepgram also reports it on short pauses inside a sentence.
    */
   speechFinal: boolean;
+  /** Speaker number of most words of the result (0, 1, ...), when the service tells speakers apart. */
+  speaker?: number;
 }
 
 export interface Sentence {
   id: number;
   text: string;
+  /** Who said it, when the speech service tells speakers apart. */
+  speaker?: number;
 }
 
 /** What the caller gets back after every input. */
@@ -155,15 +159,16 @@ function extractSentences(buffer: string): { sentences: string[]; rest: string }
  */
 export function createSentenceAssembler(): SentenceAssembler {
   let buffer = '';
+  let bufferSpeaker: number | undefined; // who said the buffered text
   let interimText = '';
   let nextId = 1;
 
   // Gives ids to the texts, after splitting over-long ones and dropping empty/punctuation-only ones.
-  function toSentences(texts: string[]): Sentence[] {
+  function toSentences(texts: string[], speaker = bufferSpeaker): Sentence[] {
     return texts
       .flatMap(splitLong)
       .filter(isMeaningful)
-      .map((text) => ({ id: nextId++, text }));
+      .map((text) => ({ id: nextId++, text, ...(speaker === undefined ? {} : { speaker }) }));
   }
 
   // Takes everything from the buffer as complete sentences.
@@ -185,9 +190,15 @@ export function createSentenceAssembler(): SentenceAssembler {
       return output([]);
     }
 
+    // Another speaker: what the previous one left unfinished is a sentence of its own.
+    const changed = Boolean(transcript) && result.speaker !== undefined && bufferSpeaker !== undefined && result.speaker !== bufferSpeaker;
+    const previousSpeaker = changed ? toSentences(takeBuffer()) : [];
+
     // An empty final result (Deepgram sends them after pauses) must not wipe the live guess.
     if (transcript) {
       interimText = '';
+      if (!buffer || changed) bufferSpeaker = result.speaker;
+      else bufferSpeaker ??= result.speaker;
       buffer = buffer ? `${buffer} ${transcript}` : transcript;
     }
 
@@ -203,7 +214,7 @@ export function createSentenceAssembler(): SentenceAssembler {
       texts.push(...pieces);
     }
 
-    return output(toSentences(texts));
+    return output([...previousSpeaker, ...toSentences(texts)]);
   }
 
   function pushUtteranceEnd(): AssemblerOutput {

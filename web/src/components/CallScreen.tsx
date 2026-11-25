@@ -72,6 +72,9 @@ export function CallScreen({
 
   const showInvitation = !stopped && state.cards.length === 0 && !state.finalText && !state.interimText;
 
+  // Labels help only when there is someone to tell apart.
+  const manySpeakers = new Set(state.cards.flatMap((card) => (card.speaker === undefined ? [] : [card.speaker]))).size > 1;
+
   return (
     <div className="call">
       <header className="call__header">
@@ -122,6 +125,7 @@ export function CallScreen({
             cards={cards}
             isLatest={cards.some((card) => card.id === latest?.id)}
             disabled={stopped}
+            speakerLabel={manySpeakers && cards[0].speaker !== undefined ? `Собеседник ${cards[0].speaker + 1}` : undefined}
             onHint={(mode) => onHint(cards[cards.length - 1].id, mode)}
             onRetranslate={onRetranslate}
           />

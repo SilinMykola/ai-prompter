@@ -62,7 +62,7 @@ Notes from live testing: models count "thinking" tokens against the token limit,
 
 **Setup.** Choose where the sound comes from (a Chrome tab, the entire screen for a desktop app such as Zoom, or the microphone), the language (German, English or automatic German + English), the provider and the two models, and optionally describe the call and your own data. Your choices (but not the call description) are remembered in this browser. Pressing "Начать" opens Chrome's share dialog: pick the call tab and tick "Also share tab audio" (for the entire-screen source: the "Entire screen" pane, which is preselected, with system audio switched on), otherwise the app tells you what to fix.
 
-**Call.** The header shows what the app is doing and a stop button. The sentences of the other person are grouped into paragraphs: at most 5 sentences, about 450 characters, and a new paragraph after a pause of 3 seconds or more (`server/src/paragraphs.ts`). Each paragraph is a row of two columns, the original on the left and its translation on the right (stacked in a narrow window), followed by the buttons "Коротко" / "Подробно" for a reply hint. Keys `1` and `2` do the same for the newest sentence (not while you type in a field). The phrase being spoken right now is shown at the bottom, its uncertain part in grey. The list follows new text until you scroll up, and resumes when you scroll back to the bottom. The layout works from 420 px wide, so it fits in a window next to the call.
+**Call.** The header shows what the app is doing and a stop button. The sentences of the other person are grouped into paragraphs: at most 5 sentences, about 450 characters, and a new paragraph after a pause of 3 seconds or more or when another person speaks (`server/src/paragraphs.ts`). When more than one person has spoken, each paragraph is labelled «Собеседник 1», «Собеседник 2» and so on; a change of speaker also ends the sentence, so one sentence never mixes two people. Speakers are told apart by Deepgram from their voices; this was checked with two synthetic voices, not yet in a real call. Each paragraph is a row of two columns, the original on the left and its translation on the right (stacked in a narrow window), followed by the buttons "Коротко" / "Подробно" for a reply hint. Keys `1` and `2` do the same for the newest sentence (not while you type in a field). The phrase being spoken right now is shown at the bottom, its uncertain part in grey. The list follows new text until you scroll up, and resumes when you scroll back to the bottom. The layout works from 420 px wide, so it fits in a window next to the call.
 
 If the connection to the server drops, the app reconnects up to 5 times (the sentences already on screen stay; their unfinished translations are marked as failed). After that, or when the server ends the session, use "Начать заново".
 
@@ -78,7 +78,7 @@ The server log contains event names, provider and model names, and error codes, 
 
 ## Speech recognition
 
-Audio goes to Deepgram's live endpoint (`wss://api.deepgram.com/v1/listen`) over a plain WebSocket, behind the `SttProvider` interface in `server/src/stt/`. Settings: `interim_results`, `smart_format`, `punctuate`, `endpointing=300`, `utterance_end_ms=1000`, `vad_events`; no `encoding`/`sample_rate`, because the browser sends a webm container. `language=multi` (Nova-3) covers German and English. A lost connection is retried after 0.5, 1, 2, 4 and 8 seconds; the browser is then asked to restart its recorder so the new connection gets a fresh webm header.
+Audio goes to Deepgram's live endpoint (`wss://api.deepgram.com/v1/listen`) over a plain WebSocket, behind the `SttProvider` interface in `server/src/stt/`. Settings: `interim_results`, `smart_format`, `punctuate`, `endpointing=300`, `utterance_end_ms=1000`, `vad_events`, `diarize` (every word gets a speaker number; a result is given the speaker of most of its words); no `encoding`/`sample_rate`, because the browser sends a webm container. `language=multi` (Nova-3) covers German and English. A lost connection is retried after 0.5, 1, 2, 4 and 8 seconds; the browser is then asked to restart its recorder so the new connection gets a fresh webm header.
 
 Differences from SPEC.md:
 
@@ -121,7 +121,7 @@ Server to client:
 |---------------------|---------------------------------------------------------------------|
 | `status`            | `state`: `connecting`, `listening`, `speaking`, `reconnecting`, `stopped` |
 | `interim`           | `finalText`, `interimText` (the live, unfinished phrase)            |
-| `sentence`          | `id`, `text`, optional `language`                                   |
+| `sentence`          | `id`, `text`, optional `language`, `paragraph`, `speaker`           |
 | `translation_delta` | `id`, `delta`                                                       |
 | `translation_done`  | `id`                                                                |
 | `translation_error` | `id`                                                                |

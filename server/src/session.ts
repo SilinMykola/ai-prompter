@@ -185,7 +185,8 @@ export function createSession(deps: SessionDeps): Session {
   function relay(output: AssemblerOutput, spokenAt?: number): void {
     for (const sentence of output.sentences) {
       history[sentence.id - 1] = sentence.text;
-      send({ type: 'sentence', id: sentence.id, text: sentence.text, paragraph: paragrapher.next(sentence.text, spokenAt) });
+      const paragraph = paragrapher.next(sentence.text, spokenAt, sentence.speaker);
+      send({ type: 'sentence', id: sentence.id, text: sentence.text, paragraph, ...(sentence.speaker === undefined ? {} : { speaker: sentence.speaker }) });
       startTranslation(sentence.id);
     }
     send({ type: 'interim', finalText: output.finalText, interimText: output.interimText });

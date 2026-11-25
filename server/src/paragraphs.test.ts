@@ -32,4 +32,17 @@ describe('paragraphs', () => {
   it('numbers from 1', () => {
     expect(setup().next()).toBe(1);
   });
+
+  it('starts a new paragraph when another known speaker talks', () => {
+    let clock = 1_000_000;
+    const paragrapher = createParagrapher(() => (clock += 500));
+
+    expect([
+      paragrapher.next('Haben Sie Fragen?', undefined, 0),
+      paragrapher.next('Ja.', undefined, 1),
+      paragrapher.next('Wie lang?', undefined, 1),
+      paragrapher.next('Kurz.', undefined, 0),
+      paragrapher.next('Gut.', undefined, undefined),
+    ]).toEqual([1, 2, 2, 3, 3]);
+  });
 });

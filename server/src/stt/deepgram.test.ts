@@ -47,6 +47,7 @@ describe('connection', () => {
       endpointing: '300',
       utterance_end_ms: '1000',
       vad_events: 'true',
+      diarize: 'true',
     });
   });
 
@@ -141,6 +142,25 @@ describe('recognition events', () => {
       [{ transcript: 'Guten Ta', isFinal: false, speechFinal: false }],
       [{ transcript: 'Guten Tag.', isFinal: true, speechFinal: true }],
     ]);
+  });
+
+  it('reports the speaker of most words of a result', () => {
+    const { sockets, h } = setup();
+    sockets[0].open();
+    const words = [0, 1, 1, 1].map((speaker, i) => ({ word: `w${i}`, speaker }));
+
+    sockets[0].receive({ ...resultMessage('w0 w1 w2 w3', true), channel: { alternatives: [{ transcript: 'w0 w1 w2 w3', words }] } });
+
+    expect(h.onResult).toHaveBeenCalledWith({ transcript: 'w0 w1 w2 w3', isFinal: true, speechFinal: false, speaker: 1 });
+  });
+
+  it('reports no speaker when the words carry none', () => {
+    const { sockets, h } = setup();
+    sockets[0].open();
+
+    sockets[0].receive({ ...resultMessage('Hallo', true), channel: { alternatives: [{ transcript: 'Hallo', words: [{ word: 'hallo' }] }] } });
+
+    expect(h.onResult).toHaveBeenCalledWith({ transcript: 'Hallo', isFinal: true, speechFinal: false });
   });
 
   it('passes an empty final result on (it can still carry speech_final)', () => {

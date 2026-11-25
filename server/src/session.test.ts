@@ -643,6 +643,21 @@ describe('developer log', () => {
   });
 });
 
+describe('speakers in the session', () => {
+  it('sends the speaker with the sentence and starts a paragraph for a new speaker', async () => {
+    const { service, connection } = await running();
+
+    service.onResult({ ...final('Haben Sie Fragen?'), speaker: 0 });
+    vi.advanceTimersByTime(500);
+    service.onResult({ ...final('Ja.'), speaker: 1 });
+
+    expect(connection.messages.filter((m) => m.type === 'sentence')).toEqual([
+      { type: 'sentence', id: 1, text: 'Haben Sie Fragen?', paragraph: 1, speaker: 0 },
+      { type: 'sentence', id: 2, text: 'Ja.', paragraph: 2, speaker: 1 },
+    ]);
+  });
+});
+
 describe('paragraphs in the session', () => {
   const paragraphOf = (connection: ReturnType<typeof setup>['connection']) =>
     connection.messages.filter((m) => m.type === 'sentence').map((m) => (m as { paragraph?: number }).paragraph);

@@ -12,6 +12,8 @@ interface ParagraphCardProps {
   isLatest: boolean;
   /** The call is over: nobody can answer requests any more. */
   disabled?: boolean;
+  /** Who is speaking, such as «Собеседник 2»; none while only one speaker was heard. */
+  speakerLabel?: string;
   /** A hint is asked for the last sentence of the paragraph: that is what was said most recently. */
   onHint(mode: HintMode): void;
   onRetranslate(id: number): void;
@@ -22,7 +24,7 @@ const HINT_BUTTONS: Array<{ mode: HintMode; label: string; key: string }> = [
   { mode: 'detailed', label: 'Подробно', key: '2' },
 ];
 
-export function ParagraphCard({ cards, isLatest, disabled = false, onHint, onRetranslate }: ParagraphCardProps) {
+export function ParagraphCard({ cards, isLatest, disabled = false, speakerLabel, onHint, onRetranslate }: ParagraphCardProps) {
   // The indicator belongs to a translation that is still coming. A finished one is never "loading".
   const waiting = cards.some(
     ({ translation }) => translation.state === 'waiting' || (translation.state === 'streaming' && translation.text === ''),
@@ -33,6 +35,7 @@ export function ParagraphCard({ cards, isLatest, disabled = false, onHint, onRet
 
   return (
     <article className={isLatest ? 'paragraph paragraph--latest' : 'paragraph'}>
+      {speakerLabel && <p className="paragraph__speaker">{speakerLabel}</p>}
       <div className="paragraph__columns">
         <p className="paragraph__original">
           {cards.map((card, index) => (

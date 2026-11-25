@@ -117,6 +117,19 @@ describe('feed', () => {
     expect(screen.getAllByRole('button', { name: 'Коротко' })).toHaveLength(2);
   });
 
+  it('labels every paragraph with its speaker once there is more than one', () => {
+    setup({ cards: [card(1, { speaker: 0 }), card(2, { speaker: 1 }), card(3, { speaker: 0 })] });
+
+    const labels = screen.getAllByRole('article').map((article) => within(article).getByText(/^Собеседник \d$/).textContent);
+    expect(labels).toEqual(['Собеседник 1', 'Собеседник 2', 'Собеседник 1']);
+  });
+
+  it('shows no speaker label while only one speaker was heard', () => {
+    setup({ cards: [card(1, { speaker: 0 }), card(2, { speaker: 0 })] });
+
+    expect(screen.queryByText(/Собеседник/)).not.toBeInTheDocument();
+  });
+
   it('asks for a hint on the last sentence of the paragraph', async () => {
     const { user, onHint } = setup({ cards: [card(1, { paragraph: 1 }), card(2, { paragraph: 1 })] });
 

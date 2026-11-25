@@ -39,6 +39,12 @@ describe('sentence cards', () => {
     });
   });
 
+  it('keeps the speaker the server gave', () => {
+    const state = run([{ type: 'sentence', id: 1, text: 'Ja.', paragraph: 1, speaker: 1 }]);
+
+    expect(card(state, 1).speaker).toBe(1);
+  });
+
   it('keeps the paragraph number the server gave, and groups neighbours with the same number', () => {
     const withParagraph = (id: number, paragraph: number): ServerMessage => ({ type: 'sentence', id, text: `S${id}`, paragraph });
     const state = run([withParagraph(1, 1), withParagraph(2, 1), withParagraph(3, 2)]);
