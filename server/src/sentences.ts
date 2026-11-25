@@ -192,7 +192,7 @@ export function createSentenceAssembler(): SentenceAssembler {
 
     // Another speaker: what the previous one left unfinished is a sentence of its own.
     const changed = Boolean(transcript) && result.speaker !== undefined && bufferSpeaker !== undefined && result.speaker !== bufferSpeaker;
-    const previousSpeaker = changed ? toSentences(takeBuffer()) : [];
+    const cutOff = changed ? toSentences(takeBuffer()) : [];
 
     // An empty final result (Deepgram sends them after pauses) must not wipe the live guess.
     if (transcript) {
@@ -214,7 +214,7 @@ export function createSentenceAssembler(): SentenceAssembler {
       texts.push(...pieces);
     }
 
-    return output([...previousSpeaker, ...toSentences(texts)]);
+    return output([...cutOff, ...toSentences(texts)]);
   }
 
   function pushUtteranceEnd(): AssemblerOutput {

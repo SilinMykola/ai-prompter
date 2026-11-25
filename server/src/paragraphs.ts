@@ -18,6 +18,11 @@ export interface Paragrapher {
    * `speaker` is who said it, when known.
    */
   next(text: string, at?: number, speaker?: number): number;
+  /**
+   * Speech recognition reconnected and numbers speakers from scratch: the next sentence starts a new
+   * paragraph, and its speaker is not compared with the ones before.
+   */
+  startOver(): void;
 }
 
 export function createParagrapher(now: () => number = Date.now): Paragrapher {
@@ -26,11 +31,13 @@ export function createParagrapher(now: () => number = Date.now): Paragrapher {
   let chars = 0;
   let lastAt = 0;
   let lastSpeaker: number | undefined;
+  let startNext = false;
 
   return {
     next(text, at = now(), speaker) {
       const startsNew =
         paragraph === 0 ||
+        startNext ||
         sentences >= MAX_SENTENCES ||
         chars + text.length > MAX_CHARS ||
         at - lastAt > MAX_GAP_MS ||
@@ -39,12 +46,17 @@ export function createParagrapher(now: () => number = Date.now): Paragrapher {
         paragraph++;
         sentences = 0;
         chars = 0;
+        startNext = false;
       }
       sentences++;
       chars += text.length;
       lastAt = at;
       if (speaker !== undefined) lastSpeaker = speaker;
       return paragraph;
+    },
+    startOver() {
+      lastSpeaker = undefined;
+      startNext = true;
     },
   };
 }

@@ -124,6 +124,12 @@ describe('feed', () => {
     expect(labels).toEqual(['Собеседник 1', 'Собеседник 2', 'Собеседник 1']);
   });
 
+  it('labels a paragraph by its first sentence with a known speaker', () => {
+    setup({ cards: [card(1, { paragraph: 1 }), card(2, { paragraph: 1, speaker: 0 }), card(3, { paragraph: 2, speaker: 1 })] });
+
+    expect(within(screen.getAllByRole('article')[0]).getByText('Собеседник 1')).toBeInTheDocument();
+  });
+
   it('shows no speaker label while only one speaker was heard', () => {
     setup({ cards: [card(1, { speaker: 0 }), card(2, { speaker: 0 })] });
 

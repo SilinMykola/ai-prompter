@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import type { HintMode, ProviderId } from '@ai-prompter/shared/protocol';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useHotkeys } from '../hooks/useHotkeys';
-import { groupParagraphs, latestCard, type CallState } from '../lib/callReducer';
+import { groupParagraphs, latestCard, type CallState, type Card } from '../lib/callReducer';
 import type { Settings } from '../lib/settings';
 import { LivePhrase } from './LivePhrase';
 import { ParagraphCard } from './ParagraphCard';
@@ -74,6 +74,10 @@ export function CallScreen({
 
   // Labels help only when there is someone to tell apart.
   const manySpeakers = new Set(state.cards.flatMap((card) => (card.speaker === undefined ? [] : [card.speaker]))).size > 1;
+  const speakerLabel = (cards: Card[]) => {
+    const speaker = cards.find((card) => card.speaker !== undefined)?.speaker;
+    return manySpeakers && speaker !== undefined ? `Собеседник ${speaker + 1}` : undefined;
+  };
 
   return (
     <div className="call">
@@ -125,7 +129,7 @@ export function CallScreen({
             cards={cards}
             isLatest={cards.some((card) => card.id === latest?.id)}
             disabled={stopped}
-            speakerLabel={manySpeakers && cards[0].speaker !== undefined ? `Собеседник ${cards[0].speaker + 1}` : undefined}
+            speakerLabel={speakerLabel(cards)}
             onHint={(mode) => onHint(cards[cards.length - 1].id, mode)}
             onRetranslate={onRetranslate}
           />

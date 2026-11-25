@@ -16,3 +16,7 @@ Each emitted sentence SHALL carry the speaker number of the text it was made of,
 #### Scenario: Unknown speaker
 - **WHEN** final results without a speaker arrive
 - **THEN** sentences are emitted without a speaker, as before
+
+#### Scenario: Interim results do not change the speaker
+- **WHEN** "Ich komme" of speaker 0 is buffered, an interim result of speaker 1 arrives, and then "gleich." of speaker 0
+- **THEN** one sentence "Ich komme gleich." with speaker 0 is emitted

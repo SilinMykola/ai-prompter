@@ -373,4 +373,39 @@ describe('speakers', () => {
 
     expect(assembler.pushResult(said('Termin.')).sentences).toEqual([{ id: 1, text: 'Ich möchte einen Termin.' }]);
   });
+
+  it('ignores the speaker of an interim result', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(said('Ich komme', 0));
+
+    expect(assembler.pushResult({ transcript: 'Ja', isFinal: false, speechFinal: false, speaker: 1 }).sentences).toEqual([]);
+    expect(assembler.pushResult(said('gleich.', 0)).sentences).toEqual([{ id: 1, text: 'Ich komme gleich.', speaker: 0 }]);
+  });
+
+  it('keeps the speaker on every piece of an over-long text', () => {
+    const assembler = createSentenceAssembler();
+    const long = Array.from({ length: 60 }, (_, i) => `wort${i}`).join(' ');
+    const pieces = [...assembler.pushResult(said(long, 1)).sentences, ...assembler.flush().sentences];
+    expect(pieces.length).toBeGreaterThan(1);
+    expect(pieces.every((s) => s.speaker === 1)).toBe(true);
+  });
+
+  it('numbers the cut-off tail before the new speaker\'s sentences', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(said('Eins.', 0));
+    assembler.pushResult(said('und', 0));
+
+    expect(assembler.pushResult(said('Zwei. Drei.', 1)).sentences.map(({ id, text }) => [id, text])).toEqual([
+      [2, 'und'],
+      [3, 'Zwei.'],
+      [4, 'Drei.'],
+    ]);
+  });
+
+  it('gives no speaker to a sentence of unknown speaker after known ones', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(said('Eins.', 0));
+
+    expect(assembler.pushResult(said('Zwei.')).sentences).toEqual([{ id: 2, text: 'Zwei.' }]);
+  });
 });

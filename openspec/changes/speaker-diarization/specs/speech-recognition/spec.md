@@ -16,3 +16,7 @@ The system SHALL ask the service for speaker numbers (`diarize=true`) and SHALL 
 #### Scenario: No words
 - **WHEN** the service sends a result without words
 - **THEN** the result is reported without a speaker
+
+#### Scenario: Tie
+- **WHEN** the service sends a result with two words of speaker 1 and two of speaker 0, speaker 1 first
+- **THEN** the result is reported with speaker 1

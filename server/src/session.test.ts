@@ -658,6 +658,35 @@ describe('speakers in the session', () => {
   });
 });
 
+describe('speakers in the session: edge cases', () => {
+  it('keeps a tail cut off by another speaker in the paragraph of the time it was spoken', async () => {
+    const { service, connection } = await running();
+    service.onResult({ ...final('Haben Sie Fragen?'), speaker: 0 });
+    vi.advanceTimersByTime(1000);
+    service.onResult({ ...final('und dann'), speaker: 0 });
+    vi.advanceTimersByTime(1500);
+    service.onResult({ ...interim('Ja'), speaker: 1 });
+    vi.advanceTimersByTime(1500);
+    service.onResult({ ...final('Ja.'), speaker: 1 });
+
+    expect(connection.messages.filter((m) => m.type === 'sentence').map((m) => (m as { paragraph?: number }).paragraph)).toEqual([1, 1, 2]);
+  });
+
+  it('ends the held phrase and forgets the speaker when recognition reconnects (numbers start over)', async () => {
+    const { service, connection } = await running();
+    service.onResult({ ...final('Ich komme'), speaker: 0 });
+
+    service.onReconnecting();
+    expect(connection.messages.filter((m) => m.type === 'sentence')).toEqual([
+      { type: 'sentence', id: 1, text: 'Ich komme', paragraph: 1, speaker: 0 },
+    ]);
+
+    service.onOpen();
+    service.onResult({ ...final('Neu.'), speaker: 0 });
+    expect(connection.messages.filter((m) => m.type === 'sentence').at(-1)).toMatchObject({ text: 'Neu.', paragraph: 2 });
+  });
+});
+
 describe('paragraphs in the session', () => {
   const paragraphOf = (connection: ReturnType<typeof setup>['connection']) =>
     connection.messages.filter((m) => m.type === 'sentence').map((m) => (m as { paragraph?: number }).paragraph);

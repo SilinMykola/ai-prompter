@@ -154,6 +154,16 @@ describe('recognition events', () => {
     expect(h.onResult).toHaveBeenCalledWith({ transcript: 'w0 w1 w2 w3', isFinal: true, speechFinal: false, speaker: 1 });
   });
 
+  it('takes the speaker seen first when two have as many words', () => {
+    const { sockets, h } = setup();
+    sockets[0].open();
+    const words = [1, 0, 0, 1].map((speaker, i) => ({ word: `w${i}`, speaker }));
+
+    sockets[0].receive({ ...resultMessage('w', true), channel: { alternatives: [{ transcript: 'w', words }] } });
+
+    expect(h.onResult).toHaveBeenCalledWith(expect.objectContaining({ speaker: 1 }));
+  });
+
   it('reports no speaker when the words carry none', () => {
     const { sockets, h } = setup();
     sockets[0].open();

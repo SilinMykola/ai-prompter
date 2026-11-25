@@ -45,4 +45,14 @@ describe('paragraphs', () => {
       paragrapher.next('Gut.', undefined, undefined),
     ]).toEqual([1, 2, 2, 3, 3]);
   });
+
+  it('starts a new paragraph after startOver and does not compare the speaker with earlier ones', () => {
+    let clock = 1_000_000;
+    const paragrapher = createParagrapher(() => (clock += 500));
+    paragrapher.next('Eins.', undefined, 1);
+
+    paragrapher.startOver();
+
+    expect([paragrapher.next('Zwei.', undefined, 0), paragrapher.next('Drei.', undefined, 0)]).toEqual([2, 2]);
+  });
 });

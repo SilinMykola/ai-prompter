@@ -28,4 +28,5 @@ In the live call of 2026-11-25 several people spoke (a teacher and other partici
 ## Impact
 
 - `server/src/stt/deepgram.ts`, `server/src/sentences.ts`, `server/src/paragraphs.ts`, `server/src/session.ts`, `shared/protocol.ts`, `web/src/lib/callReducer.ts`, `web/src/components/ParagraphCard.tsx`, `web/src/components/CallScreen.tsx`, `web/src/styles.css`, their tests; README.
+- Speaker numbers are given per recognition connection: after a reconnect speaker 1 may be another person, so the session ends the held phrase and starts a new paragraph, and labels before and after a reconnect may not match.
 - The diarizer was checked only with synthetic voices; how well it separates real participants of a noisy call is still to be seen in a real call.
