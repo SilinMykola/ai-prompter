@@ -64,3 +64,10 @@ The server SHALL answer `GET /api/config` with the default provider and the avai
 #### Scenario: No secrets
 - **WHEN** the response is inspected
 - **THEN** it contains no environment variable values other than provider ids, labels and model identifiers
+
+### Requirement: Speaker of a sentence
+The `sentence` message SHALL have an optional integer field `speaker`: the speaker number reported by speech recognition, starting at 0.
+
+#### Scenario: Shared type
+- **WHEN** the server sends a sentence of speaker 1
+- **THEN** the message type allows `speaker: 1` and the browser reads it from the shared type
