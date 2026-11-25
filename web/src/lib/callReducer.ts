@@ -17,6 +17,8 @@ export interface Card {
   /** The paragraph this sentence is shown in. A message without one makes a paragraph of its own. */
   paragraph: number;
   text: string;
+  /** Who said it (0, 1, ...), when speech recognition tells speakers apart. */
+  speaker?: number;
   translation: { text: string; state: TranslationState };
   hint: null | { mode: HintMode; text: string; state: HintState };
 }
@@ -100,6 +102,7 @@ export function callReducer(state: CallState, action: CallAction): CallState {
             id: action.id,
             paragraph: action.paragraph ?? action.id,
             text: action.text,
+            ...(action.speaker === undefined ? {} : { speaker: action.speaker }),
             translation: { text: '', state: 'waiting' },
             hint: null,
           },

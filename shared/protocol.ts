@@ -90,6 +90,8 @@ export interface SentenceMessage {
   language?: string;
   /** Sentences with the same number are shown together as one paragraph. */
   paragraph?: number;
+  /** Who said it (0, 1, ...), when speech recognition tells speakers apart. */
+  speaker?: number;
 }
 
 /**

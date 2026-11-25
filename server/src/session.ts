@@ -1,7 +1,7 @@
 import type { ClientMessage, HintMode, ServerMessage, TargetLanguage } from '@ai-prompter/shared/protocol';
 import type { Registry } from './llm';
 import type { LlmProvider } from './llm/types';
-import { createSentenceAssembler, type AssemblerOutput } from './sentences';
+import { createSentenceAssembler, type AssemblerOutput, type Sentence } from './sentences';
 import type { SttProvider, SttStream } from './stt/types';
 import { streamHint, type HintOptions } from './hint';
 import { HINT_CONTEXT_SENTENCES } from './prompts';
@@ -185,10 +185,12 @@ export function createSession(deps: SessionDeps): Session {
 
   // Sends what the sentence assembler produced: finished sentences first, then the live card text.
   // (This is also where translation will be started for each sentence in a later change.)
-  function relay(output: AssemblerOutput, spokenAt?: number): void {
+  // `spokenAt` tells, per sentence, when it was said if that was earlier than now (a held phrase).
+  function relay(output: AssemblerOutput, spokenAt?: (sentence: Sentence) => number | undefined): void {
     for (const sentence of output.sentences) {
       history[sentence.id - 1] = sentence.text;
-      send({ type: 'sentence', id: sentence.id, text: sentence.text, paragraph: paragrapher.next(sentence.text, spokenAt) });
+      const paragraph = paragrapher.next(sentence.text, spokenAt?.(sentence), sentence.speaker);
+      send({ type: 'sentence', id: sentence.id, text: sentence.text, paragraph, ...(sentence.speaker === undefined ? {} : { speaker: sentence.speaker }) });
       startTranslation(sentence.id);
     }
     send({ type: 'interim', finalText: output.finalText, interimText: output.interimText });
@@ -197,8 +199,8 @@ export function createSession(deps: SessionDeps): Session {
   // Relays recognised speech and (re)starts the wait for the rest of an unfinished phrase.
   // `heard` is true when words came (an interim result too: the speaker is still talking) or the
   // utterance ended; an empty result, which Deepgram sends during pauses, leaves the wait alone.
-  function relaySpeech(output: AssemblerOutput, heard: boolean): void {
-    relay(output);
+  function relaySpeech(output: AssemblerOutput, heard: boolean, spokenAt?: (sentence: Sentence) => number | undefined): void {
+    relay(output, spokenAt);
     if (!output.finalText) {
       clearTimeout(tailTimer);
       return;
@@ -206,7 +208,7 @@ export function createSession(deps: SessionDeps): Session {
     if (!heard) return;
     clearTimeout(tailTimer);
     tailTimer = setTimeout(() => {
-      if (state === 'running') relay(assembler.flush(), lastSpeechAt); // on stop, stop itself flushes
+      if (state === 'running') relay(assembler.flush(), () => lastSpeechAt); // on stop, stop itself flushes
     }, TAIL_HOLD_MS);
   }
 
@@ -293,8 +295,11 @@ export function createSession(deps: SessionDeps): Session {
           onResult(result) {
             if (result.isFinal) dev?.write('stt_final', result);
             const heard = result.transcript.trim() !== '';
+            const heldAt = lastSpeechAt; // when the held phrase was said, if another speaker cuts it off now
             if (heard && result.isFinal) lastSpeechAt = Date.now();
-            relaySpeech(assembler.pushResult(result), heard);
+            relaySpeech(assembler.pushResult(result), heard, (sentence) =>
+              result.speaker !== undefined && sentence.speaker !== result.speaker ? heldAt : undefined,
+            );
           },
           onUtteranceEnd() {
             dev?.write('stt_utterance_end');
@@ -302,7 +307,18 @@ export function createSession(deps: SessionDeps): Session {
             send({ type: 'status', state: 'listening' });
           },
           onSpeechStarted: () => send({ type: 'status', state: 'speaking' }),
-          onReconnecting: () => send({ type: 'status', state: 'reconnecting' }),
+          onReconnecting() {
+            // The new connection numbers speakers from scratch: what was said so far is finished.
+            if (state === 'running') {
+              const held = assembler.flush();
+              if (held.sentences.length > 0) {
+                clearTimeout(tailTimer);
+                relay(held, () => lastSpeechAt);
+              }
+            }
+            paragrapher.startOver();
+            send({ type: 'status', state: 'reconnecting' });
+          },
           onRestartRecorder: () => send({ type: 'restart_recorder' }),
           onFatal(error) {
             if (state === 'done') return;
@@ -339,7 +355,7 @@ export function createSession(deps: SessionDeps): Session {
     if ((state as State) === 'done') return; // the browser left in the meantime
     cancelHints.abort(); // a hint that is still being written is of no use any more
     clearTimeout(tailTimer);
-    relay(assembler.flush(), lastSpeechAt);
+    relay(assembler.flush(), () => lastSpeechAt);
     // Let translations that are still running finish (but not for long): the last sentences are the freshest.
     let grace: ReturnType<typeof setTimeout> | undefined;
     await Promise.race([

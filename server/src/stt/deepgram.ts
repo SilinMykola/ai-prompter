@@ -39,6 +39,19 @@ export interface DeepgramOptions {
   log?: (event: string) => void;
 }
 
+/** The speaker number held by most of the words, or undefined when no word carries one. */
+function mainSpeaker(words: unknown): number | undefined {
+  if (!Array.isArray(words)) return undefined;
+  const counts = new Map<number, number>();
+  for (const word of words) {
+    const speaker = (word as { speaker?: unknown } | null)?.speaker;
+    if (Number.isInteger(speaker)) counts.set(speaker as number, (counts.get(speaker as number) ?? 0) + 1);
+  }
+  let best: number | undefined;
+  for (const [speaker, count] of counts) if (best === undefined || count > counts.get(best)!) best = speaker;
+  return best;
+}
+
 function buildUrl(model: string, language: Language): string {
   // No `encoding` / `sample_rate`: the browser sends webm, a container whose header tells Deepgram the format.
   const params = new URLSearchParams({
@@ -50,6 +63,7 @@ function buildUrl(model: string, language: Language): string {
     endpointing: '300',
     utterance_end_ms: '1000',
     vad_events: 'true',
+    diarize: 'true', // every word gets a speaker number
   });
   return `${LISTEN_URL}?${params}`;
 }
@@ -141,10 +155,12 @@ export function createDeepgramProvider(options: DeepgramOptions): SttProvider {
         case 'Results': {
           const alternative = message.channel?.alternatives?.[0];
           if (!alternative) return;
+          const speaker = mainSpeaker(alternative.words);
           handlers.onResult({
             transcript: String(alternative.transcript ?? ''),
             isFinal: message.is_final === true,
             speechFinal: message.speech_final === true,
+            ...(speaker === undefined ? {} : { speaker }),
           });
           return;
         }
