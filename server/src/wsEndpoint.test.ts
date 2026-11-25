@@ -120,6 +120,7 @@ describe('/ws endpoint', () => {
 
     socket.send(JSON.stringify(validStart));
     await waitFor(() => stt.opened.length === 1);
+    await waitFor(() => messages.length > 0); // the server may open recognition before the status reaches us
     expect(messages[0]).toEqual({ type: 'status', state: 'connecting' });
 
     socket.send(new Uint8Array([1, 2, 3]));

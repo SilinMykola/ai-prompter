@@ -192,7 +192,7 @@ describe('recording', () => {
     first.produce([9]); // late data from the old recorder
     await new Promise((r) => setTimeout(r, 5));
     lastRecorder().produce([7]);
-    await new Promise((r) => setTimeout(r, 5));
+    await vi.waitFor(() => expect(chunks).toEqual([[7]])); // [9] would arrive first if it were delivered
 
     expect(FakeRecorder.instances).toHaveLength(2);
     expect(first.state).toBe('inactive');
@@ -283,9 +283,9 @@ describe('review fixes', () => {
     lastRecorder().produce([2]);
     lastRecorder().ondataavailable?.({ data: { size: 1, arrayBuffer: () => Promise.reject(new Error('unreadable')) } });
     lastRecorder().produce([3]);
-    await new Promise((r) => setTimeout(r, 10));
 
-    expect(chunks).toEqual([[2], [3]]);
+    // Each chunk is read after the one before it, so on a busy machine this takes a while.
+    await vi.waitFor(() => expect(chunks).toEqual([[2], [3]]));
   });
 
   it('does not start or restart a recording after stop', async () => {
