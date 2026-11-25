@@ -76,26 +76,11 @@ A dot that ends one of `z.B.`, `Dr.`, `Nr.`, `bzw.`, `ca.`, `e.g.`, `Mr.`, `Mrs.
 - **WHEN** a final result "Wir brauchen z.B." arrives and a later final result "einen Ausweis." follows
 - **THEN** nothing is emitted after the first result and one sentence "Wir brauchen z.B. einen Ausweis." is emitted after the second
 
-### Requirement: Flush on end of speech
-The assembler SHALL emit the remaining buffered text as a sentence when a final result has `speech_final` set or when an `UtteranceEnd` event arrives, even without closing punctuation.
-
-#### Scenario: speech_final flushes the tail
-- **WHEN** a final result "Ich komme gleich" arrives with `speech_final` true
-- **THEN** the sentence "Ich komme gleich" is emitted and `finalText` is empty
-
-#### Scenario: UtteranceEnd flushes the tail
-- **WHEN** the buffer holds "Ich komme gleich" and `UtteranceEnd` arrives
-- **THEN** the sentence "Ich komme gleich" is emitted
-
-#### Scenario: UtteranceEnd with an empty buffer
-- **WHEN** `UtteranceEnd` arrives and the buffer is empty
-- **THEN** no sentence is emitted
-
 ### Requirement: Over-long text is split
 The assembler SHALL NOT emit a sentence longer than 300 characters; text longer than that without a boundary SHALL be split at the last comma or space within the first 300 characters.
 
 #### Scenario: Long phrase without punctuation
-- **WHEN** a final result of 350 characters made of words separated by spaces, with no sentence mark, arrives with `speech_final` true
+- **WHEN** a final result of 350 characters made of words separated by spaces, with no sentence mark, arrives and then `flush()` is called
 - **THEN** every emitted sentence is at most 300 characters and joining them with spaces gives back the original words in order
 
 #### Scenario: Preference for a comma
@@ -123,3 +108,29 @@ Each emitted sentence SHALL get an integer id that is greater than the id of the
 #### Scenario: Independent assemblers
 - **WHEN** two assemblers are created
 - **THEN** each starts its numbering at 1
+
+### Requirement: End of speech keeps the tail
+A final result with `speech_final` set and an `UtteranceEnd` event SHALL NOT emit the buffered unfinished text; an `UtteranceEnd` SHALL clear the interim text.
+
+#### Scenario: speech_final keeps the tail
+- **WHEN** a final result "Ich komme gleich" arrives with `speech_final` true
+- **THEN** no sentence is emitted and `finalText` is "Ich komme gleich"
+
+#### Scenario: UtteranceEnd keeps the tail
+- **WHEN** the buffer holds "Das ist meine Einleitung zum", `UtteranceEnd` arrives, and then a final result "Forumsbeitrag." arrives
+- **THEN** nothing is emitted on `UtteranceEnd`, and one sentence "Das ist meine Einleitung zum Forumsbeitrag." is emitted after the final result
+
+#### Scenario: UtteranceEnd clears the live guess
+- **WHEN** the interim text is "Guten" and `UtteranceEnd` arrives
+- **THEN** `interimText` is empty
+
+### Requirement: Explicit flush
+`flush()` SHALL emit the buffered text as a sentence even without closing punctuation, clear the interim text and leave the buffer empty.
+
+#### Scenario: Flush the tail
+- **WHEN** the buffer holds "Ich komme gleich" and `flush()` is called
+- **THEN** the sentence "Ich komme gleich" is emitted and `finalText` is empty
+
+#### Scenario: Flush an empty buffer
+- **WHEN** `flush()` is called and the buffer is empty
+- **THEN** no sentence is emitted
