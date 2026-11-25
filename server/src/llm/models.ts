@@ -77,10 +77,11 @@ function generationOf(id: string): string {
   return versionOf(id).join('.');
 }
 
-// Measured on 2026-10-13 with real calls: the newest flash-lite took 7-11 s to the first word (the
-// translation timeout is 10 s) and the newer flash models answered 503, while this one answered in
-// 1-3 s every time. When it is on offer it is the default for translation.
-const PREFERRED_TRANSLATION = 'gemini-2.5-flash';
+// Measured on 2026-11-25 in a live call: gemini-2.5-flash (the earlier choice) answered 429, quota
+// exceeded, and gemini-2.5-flash-lite 404, no longer offered to new users; this one translated the
+// call (87 of 89 sentences) with a median of 2.3 s to the first word. When it is on offer it is the
+// default for translation.
+const PREFERRED_TRANSLATION = 'gemini-flash-lite-latest';
 
 export function pickDefaults(ids: string[]): DefaultModels {
   if (ids.length === 0) throw new Error('Cannot pick default models from an empty list');

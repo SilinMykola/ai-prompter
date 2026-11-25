@@ -2,9 +2,10 @@ import type { AudioSource } from './settings';
 
 // Getting the call's sound in the browser and cutting it into small pieces for the server.
 //
-// Two sources: a Chrome tab (the browser's "share screen" dialog, with the "also share tab
-// audio" checkbox) or the microphone. In both cases the sound is recorded with MediaRecorder
-// as webm/opus, delivering a chunk every 250 ms.
+// Three sources: a Chrome tab (the browser's "share screen" dialog, with the "also share tab
+// audio" checkbox), the entire screen with system audio (for a call in a desktop app such as
+// Zoom), or the microphone. In all cases the sound is recorded with MediaRecorder as webm/opus,
+// delivering a chunk every 250 ms.
 
 /** Something the user can understand and fix. The message is shown on screen. */
 export class CaptureError extends Error {
@@ -15,13 +16,31 @@ export class CaptureError extends Error {
 }
 
 const NO_TAB_AUDIO_MESSAGE = 'Звук не захвачен. Выберите вкладку Chrome и включите «Также поделиться звуком вкладки».';
+const NO_SCREEN_AUDIO_MESSAGE = 'Звук не захвачен. Выберите «Весь экран» и включите «Также поделиться системным звуком».';
 const NO_MIC_AUDIO_MESSAGE = 'Микрофон не отдаёт звук. Проверьте, что он подключён и разрешён в браузере.';
 const MIME_TYPE = 'audio/webm;codecs=opus';
 const CHUNK_MS = 250;
 
+// `systemAudio` is a Chrome option that the TypeScript DOM types do not know yet.
+type DisplayConstraints = { video: boolean | { displaySurface: 'monitor' }; audio: boolean; systemAudio?: 'include' };
+
+// What to ask the share dialog for. The entire screen is preselected for the screen source, and
+// system audio is what carries the sound of another app (macOS 14.2+ with Chrome 141+).
+const DISPLAY_REQUEST: Record<'tab' | 'screen', DisplayConstraints> = {
+  // video: true is required for the tab dialog to appear at all. We never use the video.
+  tab: { video: true, audio: true },
+  screen: { video: { displaySurface: 'monitor' }, audio: true, systemAudio: 'include' },
+};
+
+const NO_AUDIO_MESSAGE: Record<AudioSource, string> = {
+  tab: NO_TAB_AUDIO_MESSAGE,
+  screen: NO_SCREEN_AUDIO_MESSAGE,
+  mic: NO_MIC_AUDIO_MESSAGE,
+};
+
 /** The browser APIs we use. Tests pass fakes; the defaults are the real ones. */
 export interface CaptureDeps {
-  getDisplayMedia(constraints: { video: boolean; audio: boolean }): Promise<MediaStream>;
+  getDisplayMedia(constraints: DisplayConstraints): Promise<MediaStream>;
   getUserMedia(constraints: { audio: boolean }): Promise<MediaStream>;
   MediaRecorder: typeof MediaRecorder;
   MediaStream: typeof MediaStream;
@@ -38,7 +57,7 @@ export interface Capture {
 
 function defaultDeps(): CaptureDeps {
   return {
-    getDisplayMedia: (constraints) => navigator.mediaDevices.getDisplayMedia(constraints),
+    getDisplayMedia: (constraints) => navigator.mediaDevices.getDisplayMedia(constraints as DisplayMediaStreamOptions),
     getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
     MediaRecorder,
     MediaStream,
@@ -60,8 +79,7 @@ export async function createCapture(
 ): Promise<Capture> {
   let stream: MediaStream;
   try {
-    // video: true is required for the tab dialog to appear at all. We never use the video.
-    stream = source === 'tab' ? await deps.getDisplayMedia({ video: true, audio: true }) : await deps.getUserMedia({ audio: true });
+    stream = source === 'mic' ? await deps.getUserMedia({ audio: true }) : await deps.getDisplayMedia(DISPLAY_REQUEST[source]);
   } catch (error) {
     throw explain(error);
   }
@@ -69,7 +87,7 @@ export async function createCapture(
   const audioTracks = stream.getAudioTracks();
   if (audioTracks.length === 0) {
     stream.getTracks().forEach((track) => track.stop()); // otherwise the browser keeps showing "sharing"
-    throw new CaptureError(source === 'tab' ? NO_TAB_AUDIO_MESSAGE : NO_MIC_AUDIO_MESSAGE);
+    throw new CaptureError(NO_AUDIO_MESSAGE[source]);
   }
 
   // The recorder gets only the audio. The video track stays untouched (and running) until we stop.

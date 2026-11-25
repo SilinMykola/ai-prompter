@@ -229,7 +229,7 @@ describe('live text and sentences', () => {
     expect(connection.messages).toEqual([{ type: 'interim', finalText: '', interimText: 'Wie geht es' }]);
   });
 
-  it('flushes the unfinished phrase when the utterance ends', async () => {
+  it('keeps the unfinished phrase when the utterance ends', async () => {
     const { service, connection } = await running();
     service.onResult(final('Ich komme gleich'));
     connection.messages.length = 0;
@@ -237,18 +237,115 @@ describe('live text and sentences', () => {
     service.onUtteranceEnd();
 
     expect(connection.messages).toEqual([
-      { type: 'sentence', id: 1, text: 'Ich komme gleich', paragraph: 1 },
-      { type: 'interim', finalText: '', interimText: '' },
+      { type: 'interim', finalText: 'Ich komme gleich', interimText: '' },
       { type: 'status', state: 'listening' },
     ]);
   });
 
-  it('flushes on speech_final', async () => {
+  it('keeps the unfinished phrase on speech_final', async () => {
     const { service, connection } = await running();
 
     service.onResult(final('Danke schön', true));
 
-    expect(connection.messages[0]).toEqual({ type: 'sentence', id: 1, text: 'Danke schön', paragraph: 1 });
+    expect(connection.messages.filter((m) => m.type === 'sentence')).toEqual([]);
+  });
+
+  it('sends the unfinished phrase as a sentence after 3 seconds of silence', async () => {
+    const { service, connection } = await running();
+    service.onResult(final('Ich komme gleich'));
+    service.onUtteranceEnd();
+
+    vi.advanceTimersByTime(2999);
+    expect(connection.messages.filter((m) => m.type === 'sentence')).toEqual([]);
+    connection.messages.length = 0;
+
+    vi.advanceTimersByTime(1);
+    expect(connection.messages).toEqual([
+      { type: 'sentence', id: 1, text: 'Ich komme gleich', paragraph: 1 },
+      { type: 'interim', finalText: '', interimText: '' },
+    ]);
+  });
+
+  it('joins speech that goes on within 3 seconds into the same sentence', async () => {
+    const { service, connection } = await running();
+    service.onResult(final('Das ist meine Einleitung zum'));
+    service.onUtteranceEnd();
+
+    vi.advanceTimersByTime(1800);
+    service.onResult(final('Forumsbeitrag.', true));
+    vi.advanceTimersByTime(10_000);
+
+    expect(connection.messages.filter((m) => m.type === 'sentence')).toEqual([
+      { type: 'sentence', id: 1, text: 'Das ist meine Einleitung zum Forumsbeitrag.', paragraph: 1 },
+    ]);
+  });
+
+  it('puts a held tail into the paragraph of the time it was spoken, not of the flush', async () => {
+    const { service, connection } = await running();
+    service.onResult(final('Guten Tag. Wie geht'));
+    vi.advanceTimersByTime(1000);
+    service.onUtteranceEnd();
+    vi.advanceTimersByTime(3000); // the tail is flushed now, 4 s after it was spoken
+    vi.advanceTimersByTime(1000);
+    service.onResult(final('Neues Thema.'));
+
+    expect(connection.messages.filter((m) => m.type === 'sentence')).toEqual([
+      { type: 'sentence', id: 1, text: 'Guten Tag.', paragraph: 1 },
+      { type: 'sentence', id: 2, text: 'Wie geht', paragraph: 1 },
+      { type: 'sentence', id: 3, text: 'Neues Thema.', paragraph: 2 },
+    ]);
+  });
+
+  it('does not let an empty result delay the held tail', async () => {
+    const { service, connection } = await running();
+    service.onResult(final('Ich komme gleich'));
+    vi.advanceTimersByTime(2000);
+    service.onResult(final('', true)); // Deepgram sends empty finals after pauses
+    service.onResult(interim(''));
+
+    vi.advanceTimersByTime(1000);
+
+    expect(connection.messages.filter((m) => m.type === 'sentence')).toEqual([
+      { type: 'sentence', id: 1, text: 'Ich komme gleich', paragraph: 1 },
+    ]);
+  });
+
+  it('does not flush on its own while stopping, so the last words join the tail', async () => {
+    const { session, service, stt, connection } = await running();
+    service.onResult(final('Ich komme'));
+    vi.advanceTimersByTime(2000);
+    stt.opened[0].whileClosing = () => {
+      vi.advanceTimersByTime(1500); // closing takes a while; the tail timer would fire meanwhile
+      service.onResult(final('gleich.'));
+    };
+
+    await session.onText(JSON.stringify({ type: 'stop' }));
+
+    expect(connection.messages.filter((m) => m.type === 'sentence')).toEqual([
+      { type: 'sentence', id: 1, text: 'Ich komme gleich.', paragraph: 1 },
+    ]);
+  });
+
+  it('translates nothing more after the browser left with a held tail', async () => {
+    const { session, service, translate } = await running();
+    service.onResult(final('Ich komme gleich'));
+
+    session.onClose();
+    vi.advanceTimersByTime(10_000);
+
+    expect(translate).not.toHaveBeenCalled();
+  });
+
+  it('keeps waiting while interim results show the speaker is still talking', async () => {
+    const { service, connection } = await running();
+    service.onResult(final('Ich komme'));
+
+    for (let second = 1; second <= 5; second++) {
+      vi.advanceTimersByTime(1000);
+      service.onResult(interim(`gleich ${second}`));
+    }
+
+    expect(connection.messages.filter((m) => m.type === 'sentence')).toEqual([]);
   });
 });
 

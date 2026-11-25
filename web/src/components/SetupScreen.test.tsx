@@ -134,6 +134,14 @@ describe('setup screen', () => {
     });
   });
 
+  it('offers the entire screen or an app such as Zoom as a source', async () => {
+    const { user, changes } = renderScreen(twoProviders);
+
+    await user.click(screen.getByRole('radio', { name: 'Весь экран / приложение (Zoom)' }));
+
+    expect(changes.at(-1)).toMatchObject({ audioSource: 'screen' });
+  });
+
   it('starts the call with the current settings when "Начать" is pressed', async () => {
     const { user, onStart } = renderScreen(twoProviders);
     await user.click(callLanguage().getByRole('radio', { name: 'Английский' }));

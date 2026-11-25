@@ -19,6 +19,7 @@ interface SetupScreenProps {
 
 const SOURCES: Array<{ value: AudioSource; label: string }> = [
   { value: 'tab', label: 'Вкладка Chrome' },
+  { value: 'screen', label: 'Весь экран / приложение (Zoom)' },
   { value: 'mic', label: 'Микрофон' },
 ];
 

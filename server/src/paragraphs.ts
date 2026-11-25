@@ -11,8 +11,11 @@ export const MAX_CHARS = 450;
 export const MAX_GAP_MS = 3000;
 
 export interface Paragrapher {
-  /** The paragraph number (1, 2, 3...) that the next sentence belongs to. */
-  next(text: string): number;
+  /**
+   * The paragraph number (1, 2, 3...) that the next sentence belongs to. `at` is when the sentence
+   * was spoken, if that was earlier than now (a phrase held back before it became a sentence).
+   */
+  next(text: string, at?: number): number;
 }
 
 export function createParagrapher(now: () => number = Date.now): Paragrapher {
@@ -22,8 +25,7 @@ export function createParagrapher(now: () => number = Date.now): Paragrapher {
   let lastAt = 0;
 
   return {
-    next(text) {
-      const at = now();
+    next(text, at = now()) {
       const startsNew =
         paragraph === 0 ||
         sentences >= MAX_SENTENCES ||

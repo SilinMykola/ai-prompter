@@ -54,6 +54,12 @@ describe('default settings', () => {
 });
 
 describe('remembered settings', () => {
+  it('restore the entire-screen source', () => {
+    const { storage } = memoryStorage({ [KEY]: JSON.stringify({ audioSource: 'screen' }) });
+
+    expect(resolveSettings(config, storage).audioSource).toBe('screen');
+  });
+
   it('are restored', () => {
     const { storage } = memoryStorage({
       [KEY]: JSON.stringify({

@@ -6,6 +6,14 @@ import { createSentenceAssembler, type SttResult } from './sentences';
 const final = (transcript: string, speechFinal = false): SttResult => ({ transcript, isFinal: true, speechFinal });
 const interim = (transcript: string): SttResult => ({ transcript, isFinal: false, speechFinal: false });
 
+/** Pushes one final result and then flushes, returning every sentence emitted by both. */
+function pushAndFlush(transcript: string) {
+  const assembler = createSentenceAssembler();
+  const pushed = assembler.pushResult(final(transcript, true));
+  const flushed = assembler.flush();
+  return { sentences: [...pushed.sentences, ...flushed.sentences], finalText: flushed.finalText };
+}
+
 describe('interim results', () => {
   it('only update the live text and never emit sentences', () => {
     const assembler = createSentenceAssembler();
@@ -126,36 +134,73 @@ describe('abbreviations', () => {
   });
 });
 
-describe('flushing at the end of speech', () => {
-  it('speech_final flushes a tail without punctuation', () => {
+describe('end of speech keeps the tail', () => {
+  it('speech_final does not emit a tail without punctuation', () => {
     const out = createSentenceAssembler().pushResult(final('Ich komme gleich', true));
 
-    expect(out.sentences.map((s) => s.text)).toEqual(['Ich komme gleich']);
-    expect(out.finalText).toBe('');
+    expect(out.sentences).toEqual([]);
+    expect(out.finalText).toBe('Ich komme gleich');
   });
 
-  it('UtteranceEnd flushes the buffered tail', () => {
+  it('UtteranceEnd does not emit the buffered tail', () => {
     const assembler = createSentenceAssembler();
     assembler.pushResult(final('Ich komme gleich'));
 
     const out = assembler.pushUtteranceEnd();
 
+    expect(out.sentences).toEqual([]);
+    expect(out.finalText).toBe('Ich komme gleich');
+  });
+
+  it('joins a tail that continues after UtteranceEnd into one sentence', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(final('Das ist meine Einleitung zum'));
+    expect(assembler.pushUtteranceEnd().sentences).toEqual([]);
+
+    const out = assembler.pushResult(final('Forumsbeitrag.', true));
+
+    expect(out.sentences.map((s) => s.text)).toEqual(['Das ist meine Einleitung zum Forumsbeitrag.']);
+  });
+
+  it('UtteranceEnd clears the live guess', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(interim('Guten'));
+
+    expect(assembler.pushUtteranceEnd().interimText).toBe('');
+  });
+});
+
+describe('flush', () => {
+  it('emits the buffered tail without punctuation', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(final('Ich komme gleich'));
+
+    const out = assembler.flush();
+
     expect(out.sentences.map((s) => s.text)).toEqual(['Ich komme gleich']);
     expect(out.finalText).toBe('');
   });
 
-  it('UtteranceEnd with an empty buffer emits nothing', () => {
+  it('clears the live guess', () => {
+    const assembler = createSentenceAssembler();
+    assembler.pushResult(final('Ich komme'));
+    assembler.pushResult(interim('gleich'));
+
+    expect(assembler.flush().interimText).toBe('');
+  });
+
+  it('emits nothing for an empty buffer', () => {
     const assembler = createSentenceAssembler();
     assembler.pushResult(final('Das war es.'));
 
-    expect(assembler.pushUtteranceEnd().sentences).toEqual([]);
+    expect(assembler.flush().sentences).toEqual([]);
   });
 
   it('flushes a trailing abbreviation instead of losing it', () => {
     const assembler = createSentenceAssembler();
     assembler.pushResult(final('Wir brauchen z.B.'));
 
-    expect(assembler.pushUtteranceEnd().sentences.map((s) => s.text)).toEqual(['Wir brauchen z.B.']);
+    expect(assembler.flush().sentences.map((s) => s.text)).toEqual(['Wir brauchen z.B.']);
   });
 });
 
@@ -164,7 +209,7 @@ describe('over-long text', () => {
 
   it('splits a 350+ character phrase into pieces of at most 300 characters', () => {
     const text = words(60); // about 400 characters, no punctuation at all
-    const out = createSentenceAssembler().pushResult(final(text, true));
+    const out = pushAndFlush(text);
 
     expect(text.length).toBeGreaterThan(350);
     expect(out.sentences.length).toBeGreaterThan(1);
@@ -190,7 +235,7 @@ describe('over-long text', () => {
   });
 
   it('hard-cuts text that has no comma and no space', () => {
-    const out = createSentenceAssembler().pushResult(final('x'.repeat(650), true));
+    const out = pushAndFlush('x'.repeat(650));
 
     expect(out.sentences.map((s) => s.text.length)).toEqual([300, 300, 50]);
   });
@@ -277,11 +322,11 @@ describe('day numbers (German ordinal dates)', () => {
     expect(second.sentences.map((s) => s.text)).toEqual(['Der Termin ist am 12. Oktober.']);
   });
 
-  it('flushes a pending day number at the end of the utterance', () => {
+  it('flushes a pending day number', () => {
     const assembler = createSentenceAssembler();
     assembler.pushResult(final('Der Termin ist am 12.'));
 
-    expect(assembler.pushUtteranceEnd().sentences.map((s) => s.text)).toEqual(['Der Termin ist am 12.']);
+    expect(assembler.flush().sentences.map((s) => s.text)).toEqual(['Der Termin ist am 12.']);
   });
 
   it('still splits after a number with three or more digits', () => {

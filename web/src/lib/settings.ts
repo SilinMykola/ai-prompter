@@ -2,7 +2,7 @@ import type { ApiConfig, Language, ProviderId, ProviderInfo, TargetLanguage } fr
 
 // The choices a user makes on the setup screen, and what is remembered between visits.
 
-export type AudioSource = 'tab' | 'mic';
+export type AudioSource = 'tab' | 'screen' | 'mic';
 
 export interface Settings {
   audioSource: AudioSource;
@@ -28,7 +28,7 @@ export interface StorageLike {
 
 const STORAGE_KEY = 'ai-prompter.settings';
 
-const AUDIO_SOURCES: AudioSource[] = ['tab', 'mic'];
+const AUDIO_SOURCES: AudioSource[] = ['tab', 'screen', 'mic'];
 const LANGUAGES: Language[] = ['de', 'en', 'multi'];
 const TARGET_LANGUAGES: TargetLanguage[] = ['ru', 'uk', 'de', 'en'];
 

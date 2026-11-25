@@ -55,6 +55,11 @@ const DEFAULT_START_TIMEOUT_MS = 10_000;
 // On "stop", translations that are still running get this long to finish.
 const STOP_GRACE_MS = 5000;
 
+// An unfinished phrase becomes a sentence only after this long without any recognition result.
+// Deepgram reports the end of speech on short pauses inside a sentence; in a measured call the
+// speaker went on after 0.9-1.8 s, while a real end of a thought was followed by 4 s or more.
+const TAIL_HOLD_MS = 3000;
+
 export function createSession(deps: SessionDeps): Session {
   const baseLog = deps.log ?? (() => {});
   // Developer mode (opt-in per call): a full record of the call in a file. Off unless `start` asks.
@@ -85,6 +90,8 @@ export function createSession(deps: SessionDeps): Session {
   const cancelHints = new AbortController(); // aborted when the session ends or on stop (nobody reads a hint then)
   const hintControllers = new Map<number, AbortController>(); // the newest hint of each sentence
   let keyErrorReported = false;
+  let tailTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastSpeechAt = 0; // when the last recognised words arrived: the time of a held phrase
 
   // One message about a rejected key is enough, however many requests fail because of it.
   function reportKeyRejected(): void {
@@ -175,13 +182,29 @@ export function createSession(deps: SessionDeps): Session {
 
   // Sends what the sentence assembler produced: finished sentences first, then the live card text.
   // (This is also where translation will be started for each sentence in a later change.)
-  function relay(output: AssemblerOutput): void {
+  function relay(output: AssemblerOutput, spokenAt?: number): void {
     for (const sentence of output.sentences) {
       history[sentence.id - 1] = sentence.text;
-      send({ type: 'sentence', id: sentence.id, text: sentence.text, paragraph: paragrapher.next(sentence.text) });
+      send({ type: 'sentence', id: sentence.id, text: sentence.text, paragraph: paragrapher.next(sentence.text, spokenAt) });
       startTranslation(sentence.id);
     }
     send({ type: 'interim', finalText: output.finalText, interimText: output.interimText });
+  }
+
+  // Relays recognised speech and (re)starts the wait for the rest of an unfinished phrase.
+  // `heard` is true when words came (an interim result too: the speaker is still talking) or the
+  // utterance ended; an empty result, which Deepgram sends during pauses, leaves the wait alone.
+  function relaySpeech(output: AssemblerOutput, heard: boolean): void {
+    relay(output);
+    if (!output.finalText) {
+      clearTimeout(tailTimer);
+      return;
+    }
+    if (!heard) return;
+    clearTimeout(tailTimer);
+    tailTimer = setTimeout(() => {
+      if (state === 'running') relay(assembler.flush(), lastSpeechAt); // on stop, stop itself flushes
+    }, TAIL_HOLD_MS);
   }
 
   function send(message: ServerMessage): void {
@@ -207,6 +230,7 @@ export function createSession(deps: SessionDeps): Session {
     if (state === 'done') return;
     state = 'done';
     clearTimeout(startTimer);
+    clearTimeout(tailTimer);
     cancelTranslations.abort(); // nobody is listening any more
     cancelHints.abort();
     deps.close();
@@ -264,11 +288,13 @@ export function createSession(deps: SessionDeps): Session {
           onOpen: () => send({ type: 'status', state: 'listening' }),
           onResult(result) {
             if (result.isFinal) dev?.write('stt_final', result);
-            relay(assembler.pushResult(result));
+            const heard = result.transcript.trim() !== '';
+            if (heard && result.isFinal) lastSpeechAt = Date.now();
+            relaySpeech(assembler.pushResult(result), heard);
           },
           onUtteranceEnd() {
             dev?.write('stt_utterance_end');
-            relay(assembler.pushUtteranceEnd());
+            relaySpeech(assembler.pushUtteranceEnd(), true);
             send({ type: 'status', state: 'listening' });
           },
           onSpeechStarted: () => send({ type: 'status', state: 'speaking' }),
@@ -308,7 +334,8 @@ export function createSession(deps: SessionDeps): Session {
     await closeStream();
     if ((state as State) === 'done') return; // the browser left in the meantime
     cancelHints.abort(); // a hint that is still being written is of no use any more
-    relay(assembler.pushUtteranceEnd());
+    clearTimeout(tailTimer);
+    relay(assembler.flush(), lastSpeechAt);
     // Let translations that are still running finish (but not for long): the last sentences are the freshest.
     let grace: ReturnType<typeof setTimeout> | undefined;
     await Promise.race([
@@ -388,6 +415,7 @@ export function createSession(deps: SessionDeps): Session {
     if (state === 'done') return;
     state = 'done';
     clearTimeout(startTimer);
+    clearTimeout(tailTimer);
     cancelTranslations.abort();
     cancelHints.abort();
     void closeStream();

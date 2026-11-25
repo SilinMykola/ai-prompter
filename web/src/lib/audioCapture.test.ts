@@ -109,6 +109,30 @@ describe('tab capture', () => {
   });
 });
 
+describe('entire-screen capture (an app such as Zoom)', () => {
+  it('asks for the entire screen with system audio', async () => {
+    const { deps, onEnded } = setup();
+
+    await createCapture('screen', { onEnded }, deps);
+
+    expect(deps.getDisplayMedia).toHaveBeenCalledWith({
+      video: { displaySurface: 'monitor' },
+      audio: true,
+      systemAudio: 'include',
+    });
+  });
+
+  it('tells the user to share system audio when no audio came along', async () => {
+    const { deps, video, onEnded } = setup({ audio: false });
+
+    const attempt = createCapture('screen', { onEnded }, deps);
+
+    await expect(attempt).rejects.toThrow(/Звук не захвачен.*Весь экран.*системным звуком/);
+    await expect(attempt).rejects.not.toThrow(/вкладк/i);
+    expect(video.stopped).toBe(true);
+  });
+});
+
 describe('microphone', () => {
   it('asks for audio only', async () => {
     const { deps, onEnded } = setup({ video: false });

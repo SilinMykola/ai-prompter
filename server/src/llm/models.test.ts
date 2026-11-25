@@ -66,16 +66,18 @@ describe('filterClaudeModels', () => {
 });
 
 describe('pickDefaults', () => {
-  it('picks the newest flash-lite for translation and the newest plain flash for hints (Gemini)', () => {
+  it('picks gemini-flash-lite-latest for translation and the newest plain flash for hints (Gemini)', () => {
     expect(pickDefaults(filterGeminiModels(geminiList))).toEqual({
-      translation: 'gemini-2.5-flash',
+      translation: 'gemini-flash-lite-latest',
       hint: 'gemini-3.5-flash',
     });
   });
 
-  it('prefers the measured-fast gemini-2.5-flash for translation only when it is offered', () => {
-    expect(pickDefaults(['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash']).translation).toBe('gemini-2.5-flash');
-    expect(pickDefaults(['gemini-3.5-flash-lite', 'gemini-3.5-flash']).translation).toBe('gemini-3.5-flash-lite');
+  it('prefers gemini-flash-lite-latest for translation only when it is offered', () => {
+    expect(
+      pickDefaults(['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-flash-lite-latest']),
+    ).toEqual({ translation: 'gemini-flash-lite-latest', hint: 'gemini-3.5-flash' });
+    expect(pickDefaults(['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash']).translation).toBe('gemini-3.5-flash-lite');
   });
 
   it('prefers a plain flash to a pro model for hints, because pro often has no free quota', () => {

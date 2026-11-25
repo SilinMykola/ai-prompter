@@ -12,7 +12,10 @@
 export interface SttResult {
   transcript: string;
   isFinal: boolean;
-  /** Deepgram thinks the speaker has finished the phrase (a pause was detected). */
+  /**
+   * Deepgram thinks the speaker has finished the phrase (a pause was detected). Not used to end a
+   * sentence: Deepgram also reports it on short pauses inside a sentence.
+   */
   speechFinal: boolean;
 }
 
@@ -33,8 +36,13 @@ export interface AssemblerOutput {
 
 export interface SentenceAssembler {
   pushResult(result: SttResult): AssemblerOutput;
-  /** Deepgram's UtteranceEnd event: the speaker stopped, so whatever is buffered is complete. */
+  /**
+   * Deepgram's UtteranceEnd event: the speaker paused. The live guess is cleared, but the buffered
+   * text is kept, because the speaker often goes on with the same sentence after the pause.
+   */
   pushUtteranceEnd(): AssemblerOutput;
+  /** Emits whatever is buffered as a sentence, even without closing punctuation. */
+  flush(): AssemblerOutput;
 }
 
 /** A sentence is never longer than this, so one translation request stays small and fast. */
@@ -158,8 +166,8 @@ export function createSentenceAssembler(): SentenceAssembler {
       .map((text) => ({ id: nextId++, text }));
   }
 
-  // Takes everything from the buffer as complete sentences (used at the end of speech).
-  function flush(): string[] {
+  // Takes everything from the buffer as complete sentences.
+  function takeBuffer(): string[] {
     const text = buffer;
     buffer = '';
     return text ? [text] : [];
@@ -195,14 +203,18 @@ export function createSentenceAssembler(): SentenceAssembler {
       texts.push(...pieces);
     }
 
-    if (result.speechFinal) texts.push(...flush());
     return output(toSentences(texts));
   }
 
   function pushUtteranceEnd(): AssemblerOutput {
     interimText = '';
-    return output(toSentences(flush()));
+    return output([]);
   }
 
-  return { pushResult, pushUtteranceEnd };
+  function flush(): AssemblerOutput {
+    interimText = '';
+    return output(toSentences(takeBuffer()));
+  }
+
+  return { pushResult, pushUtteranceEnd, flush };
 }

@@ -2,7 +2,7 @@
 
 Local web app: live DE/EN call transcription with Russian translation and on-demand reply hints.
 
-It listens to the audio of a Chrome tab (for example a Google Meet call), shows what the other person says in the original language, translates each sentence into Russian, and suggests an answer when you ask for one.
+It listens to the audio of a Chrome tab (for example a Google Meet call) or of a desktop app such as Zoom, shows what the other person says in the original language, translates each sentence into Russian, and suggests an answer when you ask for one.
 
 > Status: work in progress. The full brief is in [SPEC.md](SPEC.md); changes are tracked with [OpenSpec](openspec/).
 
@@ -60,7 +60,7 @@ Notes from live testing: models count "thinking" tokens against the token limit,
 
 ## The screens
 
-**Setup.** Choose where the sound comes from (a Chrome tab or the microphone), the language (German, English or automatic German + English), the provider and the two models, and optionally describe the call and your own data. Your choices (but not the call description) are remembered in this browser. Pressing "Начать" opens Chrome's share dialog: pick the call tab and tick "Also share tab audio", otherwise the app tells you what to fix.
+**Setup.** Choose where the sound comes from (a Chrome tab, the entire screen for a desktop app such as Zoom, or the microphone), the language (German, English or automatic German + English), the provider and the two models, and optionally describe the call and your own data. Your choices (but not the call description) are remembered in this browser. Pressing "Начать" opens Chrome's share dialog: pick the call tab and tick "Also share tab audio" (for the entire-screen source: the "Entire screen" pane, which is preselected, with system audio switched on), otherwise the app tells you what to fix.
 
 **Call.** The header shows what the app is doing and a stop button. The sentences of the other person are grouped into paragraphs: at most 5 sentences, about 450 characters, and a new paragraph after a pause of 3 seconds or more (`server/src/paragraphs.ts`). Each paragraph is a row of two columns, the original on the left and its translation on the right (stacked in a narrow window), followed by the buttons "Коротко" / "Подробно" for a reply hint. Keys `1` and `2` do the same for the newest sentence (not while you type in a field). The phrase being spoken right now is shown at the bottom, its uncertain part in grey. The list follows new text until you scroll up, and resumes when you scroll back to the bottom. The layout works from 420 px wide, so it fits in a window next to the call.
 
@@ -84,13 +84,14 @@ Differences from SPEC.md:
 
 - `KeepAlive` is sent after 4 seconds of silence instead of 5: Deepgram closes a connection after 10 seconds without audio or `KeepAlive`, and its docs advise 3-5 seconds.
 - Audio held while the first connection opens is dropped as a whole (and a recorder restart is requested) when it exceeds 5 seconds, because dropping only the oldest chunks would lose the webm header.
-- Not yet verified: that Deepgram accepts the browser's webm/opus without an explicit `encoding`. The docs describe this for containers in general; it is confirmed only by a test with a real browser.
+- No `encoding` is sent for the browser's webm/opus; Deepgram accepts it (confirmed in a live call on 2026-11-25).
+- A phrase without closing punctuation is not emitted when Deepgram reports `speech_final` or `UtteranceEnd`, because both also come on short pauses inside a sentence (in a live call the speaker went on after 0.9-1.8 s). It becomes a sentence after 3 seconds without newly recognised words or an utterance end (empty results do not count), or when the call stops; until then it is shown as the live phrase. Speech that goes on within those 3 seconds joins the same sentence.
 
 ## LLM providers and models
 
 The app supports Gemini and Claude behind one interface (`server/src/llm/`). A provider is available only if its API key is set; one key is enough. `LLM_PROVIDER` chooses the default and falls back to the first available provider (Gemini, then Claude).
 
-Models are not listed in `.env`: at startup the server asks each provider's API for its models, keeps the text chat models (no speech, image, music or agent models), and preselects a fast model for translation (newest "flash-lite" / "haiku") and a stronger one for hints (newest "pro" / "sonnet"). The lists are cached for ten minutes. If the API cannot be asked, built-in model ids are used.
+Models are not listed in `.env`: at startup the server asks each provider's API for its models, keeps the text chat models (no speech, image, music or agent models), and preselects a fast model for translation (`gemini-flash-lite-latest` when offered, else the newest "flash-lite" / "haiku") and a stronger one for hints (newest "pro" / "sonnet"). The lists are cached for ten minutes. If the API cannot be asked, built-in model ids are used.
 
 To pin the models yourself, set `GEMINI_MODELS` or `ANTHROPIC_MODELS` to a comma-separated list: exactly those are offered, the first is the translation default and the second the hint default.
 
@@ -161,8 +162,8 @@ Speech recognition works the same way behind `SttProvider` (`server/src/stt/type
 
 ## Known limitations
 
-- **Chrome only.** Tab-audio capture and the floating window rely on Chrome (116 or newer). On macOS, Chrome cannot capture the sound of other apps (Zoom/Teams desktop clients); use a browser tab, or the microphone with the speakerphone on.
-- **Checked here only with synthesised speech, not with a real call in a browser.** The whole chain (speech, sentences, translation, hints, the origin check, reconnects at the code level) was exercised with tests and live API calls using generated German speech. Not verified automatically: the real share dialog with a Chrome tab, real `webm/opus` audio into Deepgram (the docs describe container formats in general), the floating window opened by a real click, and Claude (no Anthropic key was available; it is covered by tests with a fake client).
+- **Chrome only.** Tab-audio capture and the floating window rely on Chrome (116 or newer). The sound of a desktop app (Zoom, Teams) is captured as system audio of the entire screen, which needs Chrome 141+ on macOS 14.2+; it carries every sound of the computer (notifications, music), not only the call.
+- **One real call so far.** The whole chain (speech, sentences, translation, hints, the origin check, reconnects at the code level) was exercised with tests and live API calls using generated German speech, and one real German call through the Zoom desktop app (entire screen with system audio) was run on 2026-11-25. Not verified: the floating window opened by a real click, and Claude (no Anthropic key was available; it is covered by tests with a fake client).
 - **Free-tier API limits.** Pro-class Gemini models often have no free quota (HTTP 429); the default hint model is a plain flash for that reason. Parallel translations of fast speech can hit rate limits; the app shows a short note, waits 2 seconds, retries once, and offers "повторить".
 - **Small fast models are not perfect translators.** For example, they may add a bracketed German word that was not said. Pick a stronger translation model on the setup screen if quality matters more than speed.
 - **Sentence splitting is a heuristic.** Dots after one- or two-digit numbers ("am 12. Oktober") are treated as part of a date, so a sentence that really ends with such a number is joined with the next one. Common abbreviations are listed in `server/src/sentences.ts`.
